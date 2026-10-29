@@ -1,0 +1,374 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Client, DebitEntry } from '../types';
+import { useTheme } from '../theme/ThemeContext';
+import { usePrivacy } from '../theme/PrivacyContext';
+import { formatCurrency } from '../utils/currency';
+import { formatDateBR, getDaysDiffFromToday } from '../utils/date';
+import { getLimitUsageProgress } from '../utils/balanceCalculator';
+
+interface ClientCardProps {
+  client: Client;
+  openDebits: DebitEntry[];
+  onCobrarZap: (client: Client) => void;
+  onPassarRegua: (client: Client) => void;
+  onOpenDetails: (client: Client) => void;
+}
+
+export const ClientCard: React.FC<ClientCardProps> = ({
+  client,
+  openDebits,
+  onCobrarZap,
+  onPassarRegua,
+  onOpenDetails,
+}) => {
+  const { theme } = useTheme();
+  const { maskName, maskCurrency } = usePrivacy();
+  const [expanded, setExpanded] = useState<boolean>(false);
+
+  const displayName = maskName(client.nickname || client.name);
+  const fullName = client.name !== client.nickname ? maskName(client.name) : null;
+
+  const isDebtor = client.current_balance > 0.001;
+  const isCreditor = client.current_balance < -0.001;
+  const isZero = !isDebtor && !isCreditor;
+
+  const balanceColor = isDebtor
+    ? theme.expense
+    : isCreditor
+    ? theme.accent
+    : theme.income;
+
+  const daysDiff = getDaysDiffFromToday(client.next_billing_date);
+  const isOverdue = isDebtor && daysDiff > 0;
+  const isDueToday = isDebtor && daysDiff === 0;
+
+  const limitProgress = getLimitUsageProgress(client.current_balance, client.credit_limit);
+
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+        },
+      ]}
+    >
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => onOpenDetails(client)}
+        style={styles.cardHeader}
+      >
+        <View style={styles.headerLeft}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.nickname, { color: theme.textPrimary }]} numberOfLines={1}>
+              {displayName}
+            </Text>
+            {isOverdue && (
+              <View style={[styles.tagBadge, { backgroundColor: theme.expenseBg }]}>
+                <Ionicons name="alert-circle" size={12} color={theme.expense} />
+                <Text style={[styles.tagBadgeText, { color: theme.expense }]}>
+                  {daysDiff === 1 ? '1 dia de atraso' : `${daysDiff} dias de atraso`}
+                </Text>
+              </View>
+            )}
+            {isDueToday && (
+              <View style={[styles.tagBadge, { backgroundColor: theme.warningBg }]}>
+                <Ionicons name="time" size={12} color={theme.warning} />
+                <Text style={[styles.tagBadgeText, { color: theme.warning }]}>Cobra Hoje</Text>
+              </View>
+            )}
+          </View>
+
+          {fullName && (
+            <Text style={[styles.fullName, { color: theme.textSecondary }]} numberOfLines={1}>
+              {fullName}
+            </Text>
+          )}
+
+          <Text style={[styles.billingDateText, { color: theme.textMuted }]}>
+            {isDebtor
+              ? `Cobrança: ${formatDateBR(client.next_billing_date)}`
+              : isCreditor
+              ? 'Saldo a favor do cliente'
+              : 'Conta zerada (em dia)'}
+          </Text>
+        </View>
+
+        <View style={styles.headerRight}>
+          <Text style={[styles.balanceValue, { color: balanceColor }]}>
+            {maskCurrency(formatCurrency(client.current_balance))}
+          </Text>
+
+          {limitProgress && (
+            <View style={styles.limitGaugeRow}>
+              <View
+                style={[
+                  styles.gaugeDot,
+                  {
+                    backgroundColor:
+                      limitProgress.colorType === 'red'
+                        ? theme.expense
+                        : limitProgress.colorType === 'yellow'
+                        ? theme.warning
+                        : theme.income,
+                  },
+                ]}
+              />
+              <Text style={[styles.limitPercentText, { color: theme.textSecondary }]}>
+                {limitProgress.percent}% do limite
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* Ações Rápidas do Card */}
+      <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+        <TouchableOpacity
+          style={[styles.accordionToggle, { backgroundColor: theme.cardSecondary }]}
+          onPress={() => setExpanded(!expanded)}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={theme.textSecondary}
+          />
+          <Text style={[styles.accordionToggleText, { color: theme.textSecondary }]}>
+            {openDebits.length} {openDebits.length === 1 ? 'pendura' : 'penduras'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.buttonGroup}>
+          {isDebtor && (
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#25D366' }]}
+              onPress={() => onCobrarZap(client)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-whatsapp" size={14} color="#FFFFFF" />
+              <Text style={styles.actionBtnText}>Cobrar no Zap</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              { backgroundColor: isDebtor ? theme.primary : theme.cardSecondary },
+            ]}
+            onPress={() => onPassarRegua(client)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="checkmark-done"
+              size={14}
+              color={isDebtor ? theme.primaryText : theme.textPrimary}
+            />
+            <Text
+              style={[
+                styles.actionBtnText,
+                { color: isDebtor ? theme.primaryText : theme.textPrimary },
+              ]}
+            >
+              Passar a régua
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Accordion de Lançamentos em Aberto */}
+      {expanded && (
+        <View style={[styles.accordionBody, { borderTopColor: theme.borderLight }]}>
+          {openDebits.length === 0 ? (
+            <Text style={[styles.emptyDebitsText, { color: theme.textMuted }]}>
+              Nenhum fiado em aberto no momento.
+            </Text>
+          ) : (
+            openDebits.map((item) => (
+              <View
+                key={item.id}
+                style={[styles.debitItemRow, { borderBottomColor: theme.borderLight }]}
+              >
+                <View style={styles.debitItemLeft}>
+                  <Text style={[styles.debitDate, { color: theme.textMuted }]}>
+                    {formatDateBR(item.due_date)}
+                  </Text>
+                  <Text
+                    style={[styles.debitDesc, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {item.description || 'Fiado registrado'}
+                  </Text>
+                </View>
+                <View style={styles.debitItemRight}>
+                  {item.receipt_image_uri && (
+                    <Ionicons
+                      name="image"
+                      size={14}
+                      color={theme.primary}
+                      style={{ marginRight: 6 }}
+                    />
+                  )}
+                  <Text style={[styles.debitAmount, { color: theme.expense }]}>
+                    {maskCurrency(formatCurrency(item.amount))}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 2,
+  },
+  nickname: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  fullName: {
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  billingDateText: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  tagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  tagBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+  },
+  balanceValue: {
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  limitGaugeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+  },
+  gaugeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  limitPercentText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  actionsRow: {
+    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  accordionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  accordionToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    gap: 5,
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  accordionBody: {
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyDebitsText: {
+    fontSize: 12,
+    textAlign: 'center',
+    paddingVertical: 8,
+  },
+  debitItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  debitItemLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  debitDate: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  debitDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  debitItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  debitAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+});
