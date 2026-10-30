@@ -21,7 +21,9 @@ import { getClientDebits } from './src/database/entryRepository';
 import { getBusinessProfile } from './src/database/businessRepository';
 import { formatCurrency } from './src/utils/currency';
 import { ClientCard } from './src/components/ClientCard';
-import { SortFilterTabs } from './src/components/SortFilterTabs';
+import { SidebarDrawer } from './src/components/SidebarDrawer';
+import { SortBottomSheet } from './src/components/SortBottomSheet';
+import { ManagePixKeysModal } from './src/components/ManagePixKeysModal';
 import { NewDebitModal } from './src/components/NewDebitModal';
 import { SettleAccountModal } from './src/components/SettleAccountModal';
 import { ReceiptSuccessModal } from './src/components/ReceiptSuccessModal';
@@ -37,6 +39,14 @@ import { authenticateWithBiometrics, isBiometricsAvailable } from './src/service
 import { getSetting } from './src/database/settingsRepository';
 import { setupNotificationChannel, scheduleReminders } from './src/services/notificationService';
 
+const SORT_LABELS: Record<SortOption, string> = {
+  collection_queue: '🔥 Fila de Cobrança',
+  highest_debt: '💰 Maior Dívida',
+  lowest_debt: '📉 Menor Dívida',
+  oldest_purchase: '⏳ Mais Antiga',
+  alphabetical: '🔤 A - Z',
+};
+
 function MainScreen() {
   const { theme, cycleTheme } = useTheme();
   const { privacyEnabled, togglePrivacy, maskCurrency } = usePrivacy();
@@ -45,9 +55,15 @@ function MainScreen() {
   const [clients, setClients] = useState<Client[]>([]);
   const [openDebitsMap, setOpenDebitsMap] = useState<Record<string, DebitEntry[]>>({});
   const [tradeName, setTradeName] = useState<string>('CaloteOff');
+  const [logoUri, setLogoUri] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [sortOption, setSortOption] = useState<SortOption>('collection_queue');
   const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  // Estados de Gaveta e BottomSheet
+  const [sidebarVisible, setSidebarVisible] = useState<boolean>(false);
+  const [sortSheetVisible, setSortSheetVisible] = useState<boolean>(false);
 
   // Estados de Modais
   const [newDebitVisible, setNewDebitVisible] = useState<boolean>(false);
@@ -67,6 +83,7 @@ function MainScreen() {
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
 
   const [businessProfileVisible, setBusinessProfileVisible] = useState<boolean>(false);
+  const [pixKeysVisible, setPixKeysVisible] = useState<boolean>(false);
   const [templatesVisible, setTemplatesVisible] = useState<boolean>(false);
   const [themesVisible, setThemesVisible] = useState<boolean>(false);
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
@@ -80,6 +97,7 @@ function MainScreen() {
       ]);
       setClients(list);
       setTradeName(profile.trade_name || 'CaloteOff');
+      setLogoUri(profile.logo_uri);
 
       // Carrega débitos abertos para os cards
       const debitsEntries: Record<string, DebitEntry[]> = {};
@@ -152,48 +170,102 @@ function MainScreen() {
         backgroundColor={theme.background}
       />
 
-      {/* Top Bar */}
+      {/* TOP HEADER: MENU SANDUÍCHE (PADRÃO MINHAS FINANÇAS) + MARCA + AÇÕES RÁPIDAS */}
       <View style={[styles.topBar, { borderBottomColor: theme.borderLight }]}>
-        <View style={styles.storeBranding}>
-          <Text style={[styles.appName, { color: theme.primary }]}>CaloteOff</Text>
-          <Text style={[styles.tradeNameSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-            {tradeName}
-          </Text>
+        <View style={styles.topBarLeft}>
+          <TouchableOpacity
+            style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
+            onPress={() => setSidebarVisible(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Abrir menu lateral"
+          >
+            <Ionicons name="menu-outline" size={24} color={theme.textPrimary} />
+          </TouchableOpacity>
+
+          <View style={styles.topTitleBox}>
+            <Text style={[styles.appName, { color: theme.primary }]}>CaloteOff</Text>
+            <Text style={[styles.tradeNameSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+              {tradeName}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.topActions}>
-          {/* Alternador de Privacidade */}
+          {/* Busca Rápida */}
           <TouchableOpacity
-            style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
-            onPress={togglePrivacy}
+            style={[
+              styles.topIconBtn,
+              { backgroundColor: isSearchOpen ? theme.primaryBg : theme.cardSecondary },
+            ]}
+            onPress={() => setIsSearchOpen((prev) => !prev)}
             activeOpacity={0.7}
+            accessibilityLabel="Buscar"
           >
             <Ionicons
-              name={privacyEnabled ? 'eye-off' : 'eye'}
-              size={18}
+              name={isSearchOpen ? 'search' : 'search-outline'}
+              size={19}
+              color={isSearchOpen ? theme.primary : theme.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {/* Seletor de Ordenação (Abre Bottom Sheet Deslizante) */}
+          <TouchableOpacity
+            style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
+            onPress={() => setSortSheetVisible(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Ordenar lista"
+          >
+            <Ionicons name="swap-vertical-outline" size={19} color={theme.textSecondary} />
+          </TouchableOpacity>
+
+          {/* Alternador de Privacidade (Ocultar/Exibir Valores) */}
+          <TouchableOpacity
+            style={[
+              styles.topIconBtn,
+              { backgroundColor: privacyEnabled ? theme.primaryBg : theme.cardSecondary },
+            ]}
+            onPress={togglePrivacy}
+            activeOpacity={0.7}
+            accessibilityLabel="Modo privacidade"
+          >
+            <Ionicons
+              name={privacyEnabled ? 'eye-off' : 'eye-outline'}
+              size={19}
               color={privacyEnabled ? theme.primary : theme.textSecondary}
             />
           </TouchableOpacity>
 
-          {/* Troca Rápida de Tema */}
+          {/* Alternar Tema Rápido */}
           <TouchableOpacity
             style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
             onPress={cycleTheme}
             activeOpacity={0.7}
+            accessibilityLabel="Mudar tema"
           >
-            <Ionicons name="contrast-outline" size={18} color={theme.textSecondary} />
-          </TouchableOpacity>
-
-          {/* Configurações */}
-          <TouchableOpacity
-            style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
-            onPress={() => setSettingsVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="settings-outline" size={18} color={theme.textSecondary} />
+            <Ionicons name="contrast-outline" size={19} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Barra de Pesquisa Condicional */}
+      {isSearchOpen && (
+        <View style={[styles.searchBarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Ionicons name="search" size={18} color={theme.textMuted} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.textPrimary }]}
+            placeholder="Buscar cliente, apelido ou telefone..."
+            placeholderTextColor={theme.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Resumo de Caixa / Total na Rua */}
       <View style={[styles.metricsBanner, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -212,25 +284,23 @@ function MainScreen() {
         </View>
       </View>
 
-      {/* Barra de Pesquisa */}
-      <View style={[styles.searchBarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Ionicons name="search" size={18} color={theme.textMuted} />
-        <TextInput
-          style={[styles.searchInput, { color: theme.textPrimary }]}
-          placeholder="Buscar cliente, apelido ou zap..."
-          placeholderTextColor={theme.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={18} color={theme.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Barra Sub-header com Filtro Compacto & Contador de Clientes */}
+      <View style={styles.listSubHeader}>
+        <Text style={[styles.listCounterText, { color: theme.textMuted }]}>
+          {clients.length} {clients.length === 1 ? 'cliente' : 'clientes'}
+        </Text>
 
-      {/* Abas de Ordenação */}
-      <SortFilterTabs selected={sortOption} onSelect={setSortOption} />
+        <TouchableOpacity
+          style={[styles.sortPillBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+          onPress={() => setSortSheetVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.sortPillText, { color: theme.textPrimary }]}>
+            {SORT_LABELS[sortOption]}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={theme.textMuted} />
+        </TouchableOpacity>
+      </View>
 
       {/* Lista de Clientes */}
       <FlatList
@@ -269,11 +339,40 @@ function MainScreen() {
         }}
         activeOpacity={0.85}
       >
-        <Ionicons name="add" size={30} color={theme.primaryText} />
+        <Ionicons name="add" size={28} color={theme.primaryText} />
         <Text style={[styles.fabText, { color: theme.primaryText }]}>Pendurar</Text>
       </TouchableOpacity>
 
-      {/* Modais da Aplicação */}
+      {/* GAVETA LATERAL SANDUÍCHE (PADRÃO MINHAS FINANÇAS) */}
+      <SidebarDrawer
+        visible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+        tradeName={tradeName}
+        logoUri={logoUri}
+        onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
+        onOpenPixKeys={() => setPixKeysVisible(true)}
+        onOpenTemplates={() => setTemplatesVisible(true)}
+        onOpenBackup={() => setSettingsVisible(true)}
+        onOpenThemes={() => setThemesVisible(true)}
+        onOpenSettings={() => setSettingsVisible(true)}
+      />
+
+      {/* FOLHA INFERIOR DE ORDENAÇÃO (BOTTOM SHEET) */}
+      <SortBottomSheet
+        visible={sortSheetVisible}
+        selected={sortOption}
+        onSelect={(opt) => setSortOption(opt)}
+        onClose={() => setSortSheetVisible(false)}
+      />
+
+      {/* MODAL DEDICADO DE GESTÃO DE CHAVES PIX COM BIOMETRIA */}
+      <ManagePixKeysModal
+        visible={pixKeysVisible}
+        onClose={() => setPixKeysVisible(false)}
+        onKeysChanged={loadData}
+      />
+
+      {/* Modais de Fluxos Financeiros */}
       <NewDebitModal
         visible={newDebitVisible}
         clients={clients}
@@ -333,6 +432,7 @@ function MainScreen() {
         visible={businessProfileVisible}
         onClose={() => setBusinessProfileVisible(false)}
         onProfileUpdated={loadData}
+        onOpenPixKeys={() => setPixKeysVisible(true)}
       />
 
       <MessageTemplatesModal
@@ -351,6 +451,7 @@ function MainScreen() {
         onOpenThemes={() => setThemesVisible(true)}
         onOpenTemplates={() => setTemplatesVisible(true)}
         onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
+        onOpenPixKeys={() => setPixKeysVisible(true)}
         onDataRestored={loadData}
       />
 
@@ -425,22 +526,28 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  storeBranding: {
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  topTitleBox: {
     flex: 1,
   },
   appName: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
     letterSpacing: -0.5,
   },
   tradeNameSubtitle: {
@@ -457,73 +564,102 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  metricsBanner: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  metricsLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  metricsValue: {
-    fontSize: 26,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  badgeCount: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  badgeCountText: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     gap: 8,
   },
   searchInput: {
     flex: 1,
+    height: 44,
     fontSize: 14,
   },
+  metricsBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  metricsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metricsValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  badgeCount: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  listSubHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  listCounterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sortPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  sortPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   listContent: {
+    paddingHorizontal: 16,
     paddingBottom: 90,
-    paddingTop: 4,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    gap: 10,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    marginTop: 16,
     textAlign: 'center',
   },
   emptySub: {
     fontSize: 13,
     textAlign: 'center',
-    marginTop: 6,
     lineHeight: 18,
   },
   fab: {
@@ -532,15 +668,16 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 28,
-    elevation: 8,
-    shadowColor: '#000000',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 30,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 6,
-    gap: 6,
+    shadowRadius: 8,
+    elevation: 8,
   },
   fabText: {
     fontSize: 15,
@@ -551,33 +688,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 24,
   },
   lockIconBox: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#1E293B',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   lockTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F8FAFC',
     marginBottom: 8,
   },
   lockSub: {
     fontSize: 14,
     color: '#94A3B8',
     textAlign: 'center',
+    marginBottom: 30,
+    maxWidth: 280,
     lineHeight: 20,
-    marginBottom: 32,
   },
   unlockBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#4F46E5',
     paddingHorizontal: 24,
     paddingVertical: 14,
@@ -587,6 +726,6 @@ const styles = StyleSheet.create({
   unlockBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

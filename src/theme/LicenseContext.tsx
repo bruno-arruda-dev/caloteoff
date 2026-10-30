@@ -20,7 +20,7 @@ export interface LicenseContextType {
   triggerInfo?: PaywallTriggerInfo;
   openPaywall: (trigger?: PaywallTriggerInfo) => void;
   closePaywall: () => void;
-  purchasePlan: (plan: 'monthly' | 'annual') => Promise<void>;
+  purchasePlan: (plan: 'monthly' | 'annual' | 'lifetime') => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   resetToFree: () => Promise<void>;
 }
@@ -66,7 +66,7 @@ export const LicenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const purchasePlan = useCallback(
-    async (plan: 'monthly' | 'annual') => {
+    async (plan: 'monthly' | 'annual' | 'lifetime') => {
       try {
         await setLicensePlan(plan);
         setIsPremium(true);

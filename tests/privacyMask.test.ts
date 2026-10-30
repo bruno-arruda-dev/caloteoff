@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { maskClientName } from '../src/utils/privacy';
-import { calculateNextBillingDate, formatDateBR, getDaysDiffFromToday } from '../src/utils/date';
+import {
+  calculateNextBillingDate,
+  formatDateBR,
+  getDaysDiffFromToday,
+  getTodayISO,
+} from '../src/utils/date';
 
 describe('Privacy Masking Logic', () => {
   it('masks client name with prefix, middle asterisks and suffix', () => {
@@ -42,7 +47,7 @@ describe('Date & Billing Cycle Logic', () => {
   });
 
   it('calculates overdue days diff from today', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayISO();
     expect(getDaysDiffFromToday(today)).toBe(0);
   });
 });

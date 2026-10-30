@@ -44,27 +44,27 @@ export async function resetMessageTemplate(key: MessageTemplateKey): Promise<voi
   const defaults: Record<MessageTemplateKey, { title: string; body: string }> = {
     friendly_reminder: {
       title: 'Lembrete Preventivo (Cobra Hoje / A Vencer)',
-      body: 'Olá, {cliente}! Passando para lembrar do seu fechamento hoje na {nome_loja} no valor de {valor_total}. Para sua comodidade, você pode pagar via Pix: Chave ({tipo_chave}): {chave_pix}. Qualquer dúvida estamos à disposição!',
+      body: 'Olá, *{cliente}*! Tudo bem? 😊\n\nPassando para lembrar do seu fechamento hoje na *{nome_loja}* no valor de *{valor_total}*.\n\n{lista_compras}\n\n📱 *Chave Pix para acerto:*\n{chave_pix}\n\nQualquer dúvida estamos à disposição!',
     },
     overdue_collection: {
       title: 'Cobrança Ativa (Vencido / Atrasado)',
-      body: 'Olá, {cliente}! Tudo bem? Consta em aberto na {nome_loja} um saldo pendente de {valor_total}. Segue nossa chave Pix para acerto: {chave_pix}. Se já realizou o pagamento, por favor desconsidere.',
+      body: 'Olá, *{cliente}*! Tudo bem? 😊\n\nConsta em aberto na *{nome_loja}* um saldo pendente de *{valor_total}*.\n\n{lista_compras}\n\n📱 *Segue nossa chave Pix para acerto:*\n{chave_pix}\n\n_Se já realizou o pagamento, por favor desconsidere esta mensagem._',
     },
     full_receipt: {
       title: 'Recibo de Quitação Total ("Passou a Régua")',
-      body: 'Comprovante de Pagamento — {nome_loja}\nConfirmamos o recebimento de {valor_pago}. Sua conta está 100% liquidada (Saldo: R$ 0,00). Muito obrigado pela parceria e preferência!',
+      body: '🧾 *Comprovante de Pagamento — {nome_loja}*\n\nConfirmamos o recebimento de *{valor_pago}*.\nSua conta está *100% liquidada* (Saldo: R$ 0,00). 🎉\n\nMuito obrigado pela parceria e preferência!',
     },
     partial_receipt: {
       title: 'Recibo de Abatimento Parcial',
-      body: 'Comprovante de Abatimento — {nome_loja}\nConfirmamos o recebimento de {valor_pago}. Seu saldo restante agora é de {saldo_restante}. Obrigado!',
+      body: '🧾 *Comprovante de Abatimento — {nome_loja}*\n\nConfirmamos o recebimento de *{valor_pago}*.\nSeu saldo restante agora é de *{saldo_restante}*.\n\nAgradecemos a atenção e preferência! 👍',
     },
     credit_receipt: {
       title: 'Recibo com Saldo a Favor (Adiantamento)',
-      body: 'Comprovante de Crédito — {nome_loja}\nRecebemos o valor de {valor_pago}. Sua conta foi quitada e você ficou com um saldo credor de {saldo_restante} para suas próximas compras!',
+      body: '🧾 *Comprovante de Crédito — {nome_loja}*\n\nRecebemos o valor de *{valor_pago}*.\nSua conta foi quitada e você ficou com um *saldo a favor de {saldo_restante}* para suas próximas compras! 🌟',
     },
     open_statement: {
       title: 'Extrato Resumido das Compras em Aberto',
-      body: 'Extrato de Compras — {nome_loja}\nOlá, {cliente}! Segue o detalhamento dos seus lançamentos pendentes:\n{lista_compras}\nTotal acumulado: {valor_total}. Chave Pix para acerto: {chave_pix}.',
+      body: '📋 *Extrato de Compras — {nome_loja}*\n\nOlá, *{cliente}*! Segue o detalhamento dos seus lançamentos pendentes:\n\n{lista_compras}\n\n💰 *Total acumulado:* {valor_total}\n📱 *Chave Pix para acerto:* {chave_pix}',
     },
   };
 

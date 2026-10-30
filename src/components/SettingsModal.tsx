@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Modal,
   View,
@@ -18,12 +18,15 @@ import { getSetting, setSetting } from '../database/settingsRepository';
 import { exportBackup, pickAndRestoreBackup } from '../services/backupService';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../services/notificationService';
 
+const APP_VERSION_STRING = 'v1.0.1 (Build 2)';
+
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
-  onOpenThemes: () => void;
-  onOpenTemplates: () => void;
-  onOpenBusinessProfile: () => void;
+  onOpenThemes?: () => void;
+  onOpenTemplates?: () => void;
+  onOpenBusinessProfile?: () => void;
+  onOpenPixKeys?: () => void;
   onDataRestored?: () => void;
 }
 
@@ -33,6 +36,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenThemes,
   onOpenTemplates,
   onOpenBusinessProfile,
+  onOpenPixKeys,
   onDataRestored,
 }) => {
   const { theme, themeMode } = useTheme();
@@ -42,15 +46,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     privacyDefault,
     setPrivacyDefaultSetting,
   } = usePrivacy();
-  const { isPremium, planType, openPaywall } = useLicense();
+  const { isPremium, planType, openPaywall, purchasePlan, resetToFree } = useLicense();
 
   const [biometricsEnabled, setBiometricsEnabled] = useState<boolean>(false);
   const [hasBiometricHardware, setHasBiometricHardware] = useState<boolean>(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const devTapCountRef = useRef<number>(0);
 
   useEffect(() => {
     if (visible) {
       loadSettings();
+      devTapCountRef.current = 0;
     }
   }, [visible]);
 
@@ -66,6 +72,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setNotificationsEnabled(notifPerm.granted);
     } catch (err) {
       console.warn('Erro ao carregar configurações:', err);
+    }
+  };
+
+  const handleVersionTap = async () => {
+    devTapCountRef.current += 1;
+    if (devTapCountRef.current >= 5) {
+      devTapCountRef.current = 0;
+      await purchasePlan('lifetime');
+      Alert.alert(
+        '👑 Modo Desenvolvedor Ativado',
+        'Licença Vitalícia PRO desbloqueada com sucesso para testes do app!'
+      );
     }
   };
 
@@ -160,109 +178,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View>
               <Text style={[styles.title, { color: theme.textPrimary }]}>Configurações</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Segurança, aparência e preferências
+                Segurança, privacidade e plano
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={24} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Banner do Plano */}
-            <TouchableOpacity
-              style={[
-                styles.planBanner,
-                {
-                  backgroundColor: isPremium ? theme.incomeBg : theme.warningBg,
-                  borderColor: isPremium ? theme.income : theme.warning,
-                },
-              ]}
-              onPress={() => openPaywall()}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={isPremium ? 'shield-checkmark' : 'star'}
-                size={22}
-                color={isPremium ? theme.income : theme.warning}
-              />
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text
-                  style={[
-                    styles.planBannerTitle,
-                    { color: isPremium ? theme.income : theme.warning },
-                  ]}
-                >
-                  {isPremium
-                    ? `Assinante PRO Ativo (${planType === 'annual' ? 'Anual' : 'Mensal'})`
-                    : 'Plano Gratuito (Até 5 clientes ativos)'}
-                </Text>
-                <Text style={[styles.planBannerSub, { color: theme.textPrimary }]}>
-                  {isPremium
-                    ? 'Aproveite clientes ilimitados e comprovantes em PDF.'
-                    : 'Toque aqui para liberar clientes ilimitados e recibos em PDF.'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-            </TouchableOpacity>
-
-            {/* Seção Meu Negócio */}
-            <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-              NEGÓCIO & IDENTIDADE
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.itemRow,
-                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
-              ]}
-              onPress={() => {
-                onClose();
-                onOpenBusinessProfile();
-              }}
-            >
-              <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name="storefront-outline" size={18} color={theme.primary} />
-              </View>
-              <View style={styles.itemTextCol}>
-                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
-                  Perfil da Loja & Chaves Pix
-                </Text>
-                <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Nome fantasia, logotipo e contas Pix para recebimento
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            {/* Modelos de Mensagem */}
-            <TouchableOpacity
-              style={[
-                styles.itemRow,
-                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
-              ]}
-              onPress={() => {
-                onClose();
-                onOpenTemplates();
-              }}
-            >
-              <View style={[styles.itemIcon, { backgroundColor: '#DCFCE7' }]}>
-                <Ionicons name="logo-whatsapp" size={18} color="#16A34A" />
-              </View>
-              <View style={styles.itemTextCol}>
-                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
-                  Modelos de Mensagem e Recibos
-                </Text>
-                <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Edite os textos de cobrança e comprovantes do WhatsApp
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            {/* Seção Segurança & Bloqueio */}
+            {/* SEGURANÇA & BIOMETRIA */}
             <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
               SEGURANÇA & ACESSO
             </Text>
+
             <View
               style={[
                 styles.itemRow,
@@ -270,7 +199,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ]}
             >
               <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name="finger-print" size={18} color={theme.primary} />
+                <Ionicons name="finger-print-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
@@ -287,10 +216,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </View>
 
-            {/* Seção Privacidade no Balcão */}
+            {/* MODO PRIVACIDADE */}
             <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-              MODO PRIVACIDADE NO BALCÃO
+              MODO PRIVACIDADE (MASCARAMENTO)
             </Text>
+
             <View
               style={[
                 styles.itemRow,
@@ -298,14 +228,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ]}
             >
               <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name="eye-off-outline" size={18} color={theme.primary} />
+                <Ionicons name="eye-off-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
-                  Iniciar Sempre com Privacidade
+                  Privacidade Ativa ao Abrir
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Abre o app com nomes e valores mascarados
+                  Inicia o app com nomes ou valores ocultos
                 </Text>
               </View>
               <Switch
@@ -325,6 +255,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   },
                 ]}
                 onPress={() => setMaskTypeSetting('masked')}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
@@ -335,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     },
                   ]}
                 >
-                  Mascarar (Bru***aes)
+                  Mascarar (J*** S***)
                 </Text>
               </TouchableOpacity>
 
@@ -348,6 +279,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   },
                 ]}
                 onPress={() => setMaskTypeSetting('hidden')}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
@@ -363,33 +295,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Aparência e Temas */}
-            <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
-              APARÊNCIA & CORES
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.itemRow,
-                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
-              ]}
-              onPress={() => {
-                onClose();
-                onOpenThemes();
-              }}
-            >
-              <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name="color-palette-outline" size={18} color={theme.primary} />
-              </View>
-              <View style={styles.itemTextCol}>
-                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Tema Visual</Text>
-                <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Tema atual: {theme.name}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            {/* Notificações e Lembretes */}
+            {/* NOTIFICAÇÕES */}
             <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
               ALERTAS E COBRANÇAS
             </Text>
@@ -400,7 +306,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ]}
             >
               <View style={[styles.itemIcon, { backgroundColor: theme.warningBg }]}>
-                <Ionicons name="notifications-outline" size={18} color={theme.warning} />
+                <Ionicons name="notifications-outline" size={20} color={theme.warning} />
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
@@ -417,7 +323,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </View>
 
-            {/* Backup e Restauração */}
+            {/* BACKUP */}
             <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
               DADOS & BACKUP
             </Text>
@@ -427,16 +333,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
               ]}
               onPress={handleExportBackup}
+              activeOpacity={0.7}
             >
               <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
-                <Ionicons name="cloud-upload-outline" size={18} color={theme.primary} />
+                <Ionicons name="cloud-upload-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
                   Exportar Backup (.caloteoff)
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Salva cópia segura criptografada
+                  Salva cópia criptografada dos seus clientes e fiados
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
@@ -445,23 +352,123 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <TouchableOpacity
               style={[
                 styles.itemRow,
-                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight, marginBottom: 30 },
+                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
               ]}
               onPress={handleRestoreBackup}
+              activeOpacity={0.7}
             >
               <View style={[styles.itemIcon, { backgroundColor: theme.incomeBg }]}>
-                <Ionicons name="cloud-download-outline" size={18} color={theme.income} />
+                <Ionicons name="cloud-download-outline" size={20} color={theme.income} />
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
                   Restaurar Backup
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Importa clientes e histórico de arquivo
+                  Importa clientes e histórico de arquivo protegido
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
             </TouchableOpacity>
+
+            {/* CARD ELEGANTE DE LICENÇA & VERSÃO (PADRÃO MINHAS FINANÇAS) */}
+            <Text style={[styles.sectionHeader, { color: theme.textSecondary, marginTop: 18 }]}>
+              LICENÇA & VERSÃO
+            </Text>
+
+            <View
+              style={[
+                styles.licenseCard,
+                {
+                  backgroundColor: theme.cardSecondary,
+                  borderColor: isPremium ? theme.income : theme.border,
+                },
+              ]}
+            >
+              <View style={styles.licenseBadgeRow}>
+                <View
+                  style={[
+                    styles.licenseBadge,
+                    { backgroundColor: isPremium ? '#FEF3C7' : theme.primaryBg },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.licenseBadgeText,
+                      { color: isPremium ? '#D97706' : theme.primary },
+                    ]}
+                  >
+                    {isPremium
+                      ? `CaloteOff PRO 👑 (${
+                          planType === 'lifetime'
+                            ? 'Vitalício'
+                            : planType === 'annual'
+                            ? 'Anual'
+                            : 'Mensal'
+                        })`
+                      : 'Plano Básico Gratuito'}
+                  </Text>
+                </View>
+
+                {/* Toque 5 vezes na versão para desbloquear PRO em modo dev */}
+                <TouchableOpacity
+                  onPress={handleVersionTap}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <Text style={[styles.licenseVersionText, { color: theme.textMuted }]}>
+                    {APP_VERSION_STRING}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.licenseDescription, { color: theme.textSecondary }]}>
+                {isPremium
+                  ? 'Você tem acesso ilimitado a clientes sem restrição, recibos profissionais em PDF com seu logotipo, modo privacidade e backup seguro.'
+                  : 'Você está no plano gratuito (até 5 clientes ativos com saldo). Faça upgrade para cadastrar devedores ilimitados e gerar comprovantes em PDF.'}
+              </Text>
+
+              {!isPremium ? (
+                <TouchableOpacity
+                  style={[styles.upgradeBtn, { backgroundColor: theme.primary }]}
+                  onPress={() => {
+                    onClose();
+                    setTimeout(() => openPaywall(), 200);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="sparkles" size={16} color="#FFFFFF" />
+                  <Text style={styles.upgradeBtnText}>Desbloquear Versão PRO</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.devResetBtn, { borderColor: theme.border }]}
+                  onPress={async () => {
+                    await resetToFree();
+                    Alert.alert(
+                      'Modo Teste',
+                      'Plano redefinido para Gratuito para você testar as travas do aplicativo.'
+                    );
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="flask-outline" size={14} color={theme.textMuted} />
+                  <Text style={[styles.devResetBtnText, { color: theme.textMuted }]}>
+                    Alternar para Modo Gratuito (Ambiente de Testes)
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* SEÇÃO SOBRE O APLICATIVO */}
+            <View style={styles.aboutCard}>
+              <Text style={[styles.aboutText, { color: theme.textMuted }]}>
+                • <Text style={{ fontWeight: '700' }}>100% Offline-First:</Text> Seus clientes e fiados ficam guardados exclusivamente no banco de dados SQLite do seu celular.
+              </Text>
+              <Text style={[styles.aboutText, { color: theme.textMuted, marginTop: 4 }]}>
+                • <Text style={{ fontWeight: '700' }}>Privacidade Total:</Text> Zero servidores externos, sem rastreamento e sem propagandas.
+              </Text>
+            </View>
           </ScrollView>
         </View>
       </View>
@@ -478,6 +485,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '92%',
+    borderTopWidth: 1,
   },
   header: {
     flexDirection: 'row',
@@ -500,22 +508,6 @@ const styles = StyleSheet.create({
   },
   body: {
     padding: 20,
-  },
-  planBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  planBannerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  planBannerSub: {
-    fontSize: 12,
-    marginTop: 2,
   },
   sectionHeader: {
     fontSize: 11,
@@ -565,5 +557,71 @@ const styles = StyleSheet.create({
   maskTypeBtnText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  licenseCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 16,
+  },
+  licenseBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  licenseBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  licenseBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  licenseVersionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  licenseDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  upgradeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 44,
+    borderRadius: 12,
+  },
+  upgradeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  devResetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  devResetBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  aboutCard: {
+    paddingHorizontal: 6,
+    paddingBottom: 30,
+    marginTop: 6,
+  },
+  aboutText: {
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

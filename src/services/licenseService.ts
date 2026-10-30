@@ -1,6 +1,6 @@
 import { getSetting, setSetting } from '../database/settingsRepository';
 
-export type PlanType = 'free' | 'monthly' | 'annual';
+export type PlanType = 'free' | 'monthly' | 'annual' | 'lifetime';
 
 export interface LicenseState {
   isPremium: boolean;

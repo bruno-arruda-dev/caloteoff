@@ -12,22 +12,19 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { BusinessProfile, PixKey, PixKeyType } from '../types';
+import { BusinessProfile } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
 import {
   getBusinessProfile,
   updateBusinessProfile,
-  getPixKeys,
-  addPixKey,
-  setPrimaryKey,
-  deletePixKey,
 } from '../database/businessRepository';
 
 interface BusinessProfileModalProps {
   visible: boolean;
   onClose: () => void;
   onProfileUpdated?: () => void;
+  onOpenPixKeys?: () => void;
 }
 
 const BRAND_PALETTES = [
@@ -44,6 +41,7 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
   visible,
   onClose,
   onProfileUpdated,
+  onOpenPixKeys,
 }) => {
   const { theme } = useTheme();
   const keyboardHeight = useKeyboardBottomInset();
@@ -52,13 +50,7 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
   const [phone, setPhone] = useState<string>('');
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState<string>('#4F46E5');
-  const [pixKeys, setPixKeys] = useState<PixKey[]>([]);
-
-  // Estado para cadastro de nova chave Pix
-  const [showAddPix, setShowAddPix] = useState<boolean>(false);
-  const [newPixLabel, setNewPixLabel] = useState<string>('');
-  const [newPixType, setNewPixType] = useState<PixKeyType>('PHONE');
-  const [newPixValue, setNewPixValue] = useState<string>('');
+  const [hexInput, setHexInput] = useState<string>('#4F46E5');
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -69,13 +61,13 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
 
   const loadData = async () => {
     try {
-      const [profile, keys] = await Promise.all([getBusinessProfile(), getPixKeys()]);
+      const profile = await getBusinessProfile();
       setTradeName(profile.trade_name);
       setPhone(profile.phone);
       setLogoUri(profile.logo_uri);
-      setPrimaryColor(profile.primary_color);
-      setPixKeys(keys);
-      setShowAddPix(false);
+      const color = profile.primary_color || '#4F46E5';
+      setPrimaryColor(color);
+      setHexInput(color);
     } catch (err) {
       console.warn('Erro ao carregar perfil do negócio:', err);
     }
@@ -95,7 +87,28 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
       }
     } catch (err) {
       console.warn('Erro ao escolher logotipo:', err);
+      Alert.alert('Erro', 'Não foi possível carregar a imagem da galeria.');
     }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoUri(null);
+  };
+
+  const handleHexChange = (text: string) => {
+    let cleaned = text.trim();
+    if (!cleaned.startsWith('#')) {
+      cleaned = '#' + cleaned;
+    }
+    setHexInput(cleaned.toUpperCase());
+    if (/^#[0-9A-Fa-f]{6}$/.test(cleaned)) {
+      setPrimaryColor(cleaned.toUpperCase());
+    }
+  };
+
+  const handleSelectColorPreset = (color: string) => {
+    setPrimaryColor(color);
+    setHexInput(color);
   };
 
   const handleSaveProfile = async () => {
@@ -104,9 +117,14 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
       return;
     }
 
+    let finalColor = primaryColor;
+    if (/^#[0-9A-Fa-f]{6}$/.test(hexInput)) {
+      finalColor = hexInput;
+    }
+
     setLoading(true);
     try {
-      await updateBusinessProfile(tradeName, phone, logoUri, primaryColor);
+      await updateBusinessProfile(tradeName.trim(), phone.trim(), logoUri, finalColor);
       Alert.alert('Sucesso', 'Perfil da sua loja atualizado com sucesso!');
       if (onProfileUpdated) onProfileUpdated();
       onClose();
@@ -115,50 +133,6 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddPix = async () => {
-    if (!newPixValue.trim()) {
-      Alert.alert('Atenção', 'Informe o valor da chave Pix.');
-      return;
-    }
-
-    try {
-      await addPixKey(
-        newPixLabel.trim() || newPixType,
-        newPixType,
-        newPixValue.trim(),
-        pixKeys.length === 0
-      );
-      setNewPixLabel('');
-      setNewPixValue('');
-      setShowAddPix(false);
-      const updated = await getPixKeys();
-      setPixKeys(updated);
-    } catch (err: any) {
-      Alert.alert('Erro', err.message || 'Falha ao adicionar chave Pix');
-    }
-  };
-
-  const handleSetPrimaryPix = async (id: string) => {
-    await setPrimaryKey(id);
-    const updated = await getPixKeys();
-    setPixKeys(updated);
-  };
-
-  const handleDeletePix = async (id: string) => {
-    Alert.alert('Remover Chave', 'Deseja realmente remover esta chave Pix?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: async () => {
-          await deletePixKey(id);
-          const updated = await getPixKeys();
-          setPixKeys(updated);
-        },
-      },
-    ]);
   };
 
   return (
@@ -178,18 +152,18 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
             <View>
               <Text style={[styles.title, { color: theme.textPrimary }]}>Meu Negócio</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Perfil, identidade e chaves Pix da sua loja
+                Perfil, identidade e personalização da loja
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={24} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Logo do Negócio */}
+            {/* Logo do Negócio com Botão de Ação */}
             <View style={styles.logoSection}>
-              <TouchableOpacity onPress={handlePickLogo} style={styles.logoContainer}>
+              <TouchableOpacity onPress={handlePickLogo} style={styles.logoContainer} activeOpacity={0.8}>
                 {logoUri ? (
                   <Image source={{ uri: logoUri }} style={styles.logoImage} />
                 ) : (
@@ -199,11 +173,35 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
                       { backgroundColor: theme.cardSecondary, borderColor: theme.border },
                     ]}
                   >
-                    <Ionicons name="storefront" size={32} color={theme.primary} />
-                    <Text style={[styles.logoText, { color: theme.primary }]}>Adicionar Logo</Text>
+                    <Ionicons name="storefront" size={34} color={theme.primary} />
+                    <Text style={[styles.logoText, { color: theme.primary }]}>Subir Logotipo</Text>
                   </View>
                 )}
               </TouchableOpacity>
+
+              <View style={styles.logoActionBtns}>
+                <TouchableOpacity
+                  style={[styles.logoBtn, { backgroundColor: theme.primaryBg }]}
+                  onPress={handlePickLogo}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="image-outline" size={16} color={theme.primary} />
+                  <Text style={[styles.logoBtnText, { color: theme.primary }]}>
+                    {logoUri ? 'Alterar Logo' : 'Escolher Imagem'}
+                  </Text>
+                </TouchableOpacity>
+
+                {logoUri && (
+                  <TouchableOpacity
+                    style={[styles.logoBtn, { backgroundColor: '#FEE2E2' }]}
+                    onPress={handleRemoveLogo}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                    <Text style={[styles.logoBtnText, { color: "#DC2626" }]}>Remover</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
             {/* Nome Fantasia */}
@@ -250,14 +248,16 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
               />
             </View>
 
-            {/* Seletor de Cor Primária da Marca */}
+            {/* Seletor de Cor Primária da Marca + Input Hexadecimal */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Cor da sua Marca (nos recibos e PDFs)
+                Cor da sua Marca (nos relatórios, recibos e PDFs)
               </Text>
+
+              {/* Bolinhas de Presets */}
               <View style={styles.paletteRow}>
                 {BRAND_PALETTES.map((color) => {
-                  const isSelected = primaryColor === color;
+                  const isSelected = primaryColor.toUpperCase() === color.toUpperCase();
                   return (
                     <TouchableOpacity
                       key={color}
@@ -266,183 +266,79 @@ export const BusinessProfileModal: React.FC<BusinessProfileModalProps> = ({
                         { backgroundColor: color },
                         isSelected && styles.colorCircleSelected,
                       ]}
-                      onPress={() => setPrimaryColor(color)}
+                      onPress={() => handleSelectColorPreset(color)}
+                      activeOpacity={0.7}
                     >
                       {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
                     </TouchableOpacity>
                   );
                 })}
               </View>
-            </View>
 
-            {/* Seção de Chaves Pix */}
-            <View style={styles.pixSection}>
-              <View style={styles.pixHeader}>
-                <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-                  Chaves Pix para Recebimento
-                </Text>
-                <TouchableOpacity
-                  style={[styles.addPixSmallBtn, { backgroundColor: theme.primaryBg }]}
-                  onPress={() => setShowAddPix(!showAddPix)}
-                >
-                  <Ionicons name="add" size={16} color={theme.primary} />
-                  <Text style={[styles.addPixText, { color: theme.primary }]}>Nova Chave</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Formulário Inline de Nova Chave */}
-              {showAddPix && (
+              {/* Campo de Código Hexadecimal Customizado */}
+              <View style={styles.hexRow}>
+                <View style={[styles.colorPreviewSwatch, { backgroundColor: primaryColor }]} />
                 <View
                   style={[
-                    styles.addPixForm,
+                    styles.hexInputWrapper,
                     { backgroundColor: theme.cardSecondary, borderColor: theme.border },
                   ]}
                 >
-                  <Text style={[styles.label, { color: theme.textSecondary }]}>Tipo de Chave</Text>
-                  <View style={styles.pixTypeRow}>
-                    {(['PHONE', 'CPF', 'CNPJ', 'EMAIL', 'RANDOM'] as PixKeyType[]).map((type) => (
-                      <TouchableOpacity
-                        key={type}
-                        style={[
-                          styles.pixTypeChip,
-                          {
-                            backgroundColor:
-                              newPixType === type ? theme.primary : theme.surface,
-                          },
-                        ]}
-                        onPress={() => setNewPixType(type)}
-                      >
-                        <Text
-                          style={[
-                            styles.pixTypeChipText,
-                            {
-                              color:
-                                newPixType === type ? theme.primaryText : theme.textSecondary,
-                            },
-                          ]}
-                        >
-                          {type}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
+                  <Text style={[styles.hexPrefix, { color: theme.textMuted }]}>HEX:</Text>
                   <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.border,
-                        color: theme.textPrimary,
-                        marginTop: 10,
-                      },
-                    ]}
-                    placeholder="Valor da chave Pix..."
+                    style={[styles.hexInput, { color: theme.textPrimary }]}
+                    placeholder="#4F46E5"
                     placeholderTextColor={theme.textMuted}
-                    value={newPixValue}
-                    onChangeText={setNewPixValue}
+                    maxLength={7}
+                    autoCapitalize="characters"
+                    value={hexInput}
+                    onChangeText={handleHexChange}
                   />
-
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: theme.surface,
-                        borderColor: theme.border,
-                        color: theme.textPrimary,
-                        marginTop: 8,
-                      },
-                    ]}
-                    placeholder="Etiqueta (ex: Nubank, Banco Inter)..."
-                    placeholderTextColor={theme.textMuted}
-                    value={newPixLabel}
-                    onChangeText={setNewPixLabel}
-                  />
-
-                  <TouchableOpacity
-                    style={[styles.savePixBtn, { backgroundColor: theme.primary }]}
-                    onPress={handleAddPix}
-                  >
-                    <Text style={[styles.savePixBtnText, { color: theme.primaryText }]}>
-                      Salvar Chave Pix
-                    </Text>
-                  </TouchableOpacity>
                 </View>
-              )}
-
-              {/* Lista de Chaves Cadastradas */}
-              {pixKeys.length === 0 ? (
-                <Text style={[styles.emptyPixText, { color: theme.textMuted }]}>
-                  Nenhuma chave Pix cadastrada. Adicione uma para facilitar a cobrança no Zap!
-                </Text>
-              ) : (
-                pixKeys.map((k) => (
-                  <View
-                    key={k.id}
-                    style={[
-                      styles.pixKeyItem,
-                      { backgroundColor: theme.cardSecondary, borderColor: theme.border },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.pixLabel, { color: theme.textPrimary }]}>
-                          {k.label} ({k.key_type})
-                        </Text>
-                        {k.is_primary && (
-                          <View
-                            style={[
-                              styles.primaryBadge,
-                              { backgroundColor: theme.incomeBg },
-                            ]}
-                          >
-                            <Text style={[styles.primaryBadgeText, { color: theme.income }]}>
-                              Principal
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={[styles.pixValue, { color: theme.textSecondary }]}>
-                        {k.key_value}
-                      </Text>
-                    </View>
-
-                    <View style={styles.pixItemActions}>
-                      {!k.is_primary && (
-                        <TouchableOpacity
-                          style={styles.actionIconBtn}
-                          onPress={() => handleSetPrimaryPix(k.id)}
-                        >
-                          <Ionicons name="star-outline" size={18} color={theme.primary} />
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity
-                        style={styles.actionIconBtn}
-                        onPress={() => handleDeletePix(k.id)}
-                      >
-                        <Ionicons name="trash-outline" size={18} color={theme.expense} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
-              )}
+              </View>
             </View>
-          </ScrollView>
 
-          {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
+            {/* Atalho para Gerenciamento de Chaves Pix */}
+            {onOpenPixKeys && (
+              <TouchableOpacity
+                style={[
+                  styles.pixShortcutCard,
+                  { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
+                ]}
+                onPress={() => {
+                  onClose();
+                  setTimeout(() => onOpenPixKeys(), 200);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.pixIconBox, { backgroundColor: '#EDE9FE' }]}>
+                  <Ionicons name="qr-code-outline" size={22} color="#7C3AED" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pixCardTitle, { color: theme.textPrimary }]}>
+                    Gerenciar Chaves Pix
+                  </Text>
+                  <Text style={[styles.pixCardSub, { color: theme.textSecondary }]}>
+                    Cadastre suas chaves e selecione a conta principal para recebimento
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
+
+            {/* Botão Salvar Perfil */}
             <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: theme.primary }]}
+              style={[styles.saveBtn, { backgroundColor: theme.primary }]}
               onPress={handleSaveProfile}
               disabled={loading}
               activeOpacity={0.8}
             >
-              <Ionicons name="checkmark-sharp" size={20} color={theme.primaryText} />
-              <Text style={[styles.saveButtonText, { color: theme.primaryText }]}>
+              <Ionicons name="save-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.saveBtnText}>
                 {loading ? 'Salvando...' : 'Salvar Alterações'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -457,26 +353,27 @@ const styles = StyleSheet.create({
   drawerContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '92%',
+    maxHeight: '90%',
+    borderTopWidth: 1,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 2,
   },
   closeBtn: {
-    padding: 4,
+    padding: 6,
   },
   body: {
     padding: 20,
@@ -486,35 +383,50 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   logoContainer: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    overflow: 'hidden',
+    marginBottom: 10,
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
   },
   logoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 45,
-    borderWidth: 1,
-    justifyContent: 'center',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 2,
+    borderStyle: 'dashed',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   logoText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    marginTop: 2,
+  },
+  logoActionBtns: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  logoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  logoBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   input: {
     height: 48,
@@ -526,128 +438,90 @@ const styles = StyleSheet.create({
   paletteRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginBottom: 12,
   },
   colorCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   colorCircleSelected: {
     borderWidth: 3,
     borderColor: '#FFFFFF',
-    elevation: 4,
+    transform: [{ scale: 1.15 }],
   },
-  pixSection: {
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  pixHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  addPixSmallBtn: {
+  hexRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    gap: 4,
+    gap: 10,
   },
-  addPixText: {
-    fontSize: 12,
+  colorPreviewSwatch: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  hexInputWrapper: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  hexPrefix: {
+    fontSize: 13,
     fontWeight: '700',
+    marginRight: 6,
   },
-  addPixForm: {
+  hexInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  pixShortcutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 20,
+    gap: 12,
   },
-  pixTypeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  pixTypeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  pixTypeChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  savePixBtn: {
+  pixIconBox: {
+    width: 42,
     height: 42,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  savePixBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  emptyPixText: {
-    fontSize: 12,
-    textAlign: 'center',
-    paddingVertical: 12,
-  },
-  pixKeyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pixLabel: {
-    fontSize: 13,
+  pixCardTitle: {
+    fontSize: 14,
     fontWeight: '700',
   },
-  primaryBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  primaryBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  pixValue: {
-    fontSize: 12,
+  pixCardSub: {
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 2,
   },
-  pixItemActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionIconBtn: {
-    padding: 6,
-  },
-  footer: {
-    padding: 20,
-    borderTopWidth: 1,
-  },
-  saveButton: {
+  saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    borderRadius: 16,
     gap: 8,
+    height: 50,
+    borderRadius: 14,
+    marginBottom: 30,
   },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
+  saveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

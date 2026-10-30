@@ -25,7 +25,10 @@ export async function generateMessageText(
   const clientName = context.client.nickname || context.client.name;
   const storeName = profile.trade_name || 'Nossa Loja';
   const totalAmount = formatCurrency(Math.max(0, context.client.current_balance));
-  const pixKey = primaryPix ? primaryPix.key_value : '(Chave Pix não configurada)';
+  
+  const pixKey = primaryPix && primaryPix.key_value && primaryPix.key_value.trim()
+    ? primaryPix.key_value.trim()
+    : '(Cadastre sua chave Pix no app)';
   const pixType = primaryPix ? primaryPix.label || primaryPix.key_type : 'Pix';
 
   let paidAmount = 'R$ 0,00';
@@ -46,14 +49,14 @@ export async function generateMessageText(
   }
 
   let text = template.body;
-  text = text.replace(/{cliente}/g, clientName);
-  text = text.replace(/{nome_loja}/g, storeName);
-  text = text.replace(/{valor_total}/g, totalAmount);
-  text = text.replace(/{chave_pix}/g, pixKey);
-  text = text.replace(/{tipo_chave}/g, pixType);
-  text = text.replace(/{valor_pago}/g, paidAmount);
-  text = text.replace(/{saldo_restante}/g, remainingAmount);
-  text = text.replace(/{lista_compras}/g, purchasesList);
+  text = text.replace(/{cliente}/gi, clientName);
+  text = text.replace(/{nome_loja}/gi, storeName);
+  text = text.replace(/{valor_total}/gi, totalAmount);
+  text = text.replace(/{chave_pix}/gi, pixKey);
+  text = text.replace(/{tipo_chave}/gi, pixType);
+  text = text.replace(/{valor_pago}/gi, paidAmount);
+  text = text.replace(/{saldo_restante}/gi, remainingAmount);
+  text = text.replace(/{lista_compras}/gi, purchasesList);
 
   return text;
 }
