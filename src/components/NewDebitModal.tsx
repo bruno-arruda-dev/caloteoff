@@ -97,6 +97,14 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
       return;
     }
 
+    if (selectedClient.deleted_at) {
+      Alert.alert(
+        'Cliente Desativado',
+        'Este cliente foi inativado e não pode realizar novas compras fiadas. Para liberar novas vendas, reative o cadastro na tela de Clientes.'
+      );
+      return;
+    }
+
     const amount = parseCurrencyInput(amountRaw);
     if (amount <= 0) {
       Alert.alert('Atenção', 'Informe um valor válido maior que zero.');
@@ -160,7 +168,9 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
     }
   };
 
-  const filteredClients = clients.filter((c) => {
+  const activeClients = clients.filter((c) => !c.deleted_at);
+
+  const filteredClients = activeClients.filter((c) => {
     if (!clientSearch) return true;
     const term = clientSearch.toLowerCase();
     return (

@@ -91,6 +91,7 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
       billing_day INTEGER NOT NULL DEFAULT 10,
       notes TEXT DEFAULT '',
       credit_balance REAL NOT NULL DEFAULT 0,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -148,6 +149,13 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_payments_client ON payments(client_id);
     CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
   `);
+
+  // Migração segura para adicionar coluna deleted_at caso a tabela já exista
+  try {
+    await db.runAsync('ALTER TABLE clients ADD COLUMN deleted_at TEXT;');
+  } catch {
+    // Coluna já existe
+  }
 
   // Semente do Perfil do Negócio Inicial se vazio
   const profile = await db.getFirstAsync('SELECT id FROM business_profile WHERE id = ?', ['default']);

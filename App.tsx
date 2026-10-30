@@ -24,6 +24,7 @@ import { ClientCard } from './src/components/ClientCard';
 import { SidebarDrawer } from './src/components/SidebarDrawer';
 import { SortBottomSheet } from './src/components/SortBottomSheet';
 import { ManagePixKeysModal } from './src/components/ManagePixKeysModal';
+import { ManageClientsModal } from './src/components/ManageClientsModal';
 import { NewDebitModal } from './src/components/NewDebitModal';
 import { SettleAccountModal } from './src/components/SettleAccountModal';
 import { ReceiptSuccessModal } from './src/components/ReceiptSuccessModal';
@@ -83,6 +84,7 @@ function MainScreen() {
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
 
   const [businessProfileVisible, setBusinessProfileVisible] = useState<boolean>(false);
+  const [clientsModalVisible, setClientsModalVisible] = useState<boolean>(false);
   const [pixKeysVisible, setPixKeysVisible] = useState<boolean>(false);
   const [templatesVisible, setTemplatesVisible] = useState<boolean>(false);
   const [themesVisible, setThemesVisible] = useState<boolean>(false);
@@ -349,12 +351,34 @@ function MainScreen() {
         onClose={() => setSidebarVisible(false)}
         tradeName={tradeName}
         logoUri={logoUri}
+        onOpenClients={() => setClientsModalVisible(true)}
         onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
         onOpenPixKeys={() => setPixKeysVisible(true)}
         onOpenTemplates={() => setTemplatesVisible(true)}
         onOpenBackup={() => setSettingsVisible(true)}
         onOpenThemes={() => setThemesVisible(true)}
         onOpenSettings={() => setSettingsVisible(true)}
+      />
+
+      {/* MODAL DEDICADO DE GESTÃO DA CARTEIRA DE CLIENTES (CRUD PAGINADO) */}
+      <ManageClientsModal
+        visible={clientsModalVisible}
+        onClose={() => {
+          setClientsModalVisible(false);
+          loadData();
+        }}
+        onNewClient={() => {
+          setClientToEdit(null);
+          setClientFormVisible(true);
+        }}
+        onEditClient={(client) => {
+          setClientToEdit(client);
+          setClientFormVisible(true);
+        }}
+        onViewHistory={(client) => {
+          setSelectedClientDetail(client);
+          setDetailModalVisible(true);
+        }}
       />
 
       {/* FOLHA INFERIOR DE ORDENAÇÃO (BOTTOM SHEET) */}

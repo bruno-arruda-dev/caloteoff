@@ -20,6 +20,7 @@ interface SidebarDrawerProps {
   onClose: () => void;
   tradeName: string;
   logoUri?: string | null;
+  onOpenClients: () => void;
   onOpenBusinessProfile: () => void;
   onOpenPixKeys: () => void;
   onOpenTemplates: () => void;
@@ -35,6 +36,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onClose,
   tradeName,
   logoUri,
+  onOpenClients,
   onOpenBusinessProfile,
   onOpenPixKeys,
   onOpenTemplates,
@@ -147,6 +149,23 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
           <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
             {/* Seção 1: MEU NEGÓCIO & VENDAS */}
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>MEU NEGÓCIO & VENDAS</Text>
+
+            <TouchableOpacity
+              style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+              onPress={() => handleAction(onOpenClients)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#E0F2FE' }]}>
+                <Ionicons name="people-outline" size={20} color="#0284C7" />
+              </View>
+              <View style={styles.itemTextContainer}>
+                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Clientes</Text>
+                <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
+                  Cadastro, histórico e gestão da carteira
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}

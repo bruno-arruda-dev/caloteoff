@@ -51,6 +51,7 @@ export interface Client {
   current_balance: number; // >0 deve, ==0 zerado, <0 crédito
   credit_balance: number; // saldo a favor
   next_billing_date: string; // YYYY-MM-DD
+  deleted_at: string | null; // Soft delete: cliente inativo não pode comprar, mas pode receber cobranças/recibos
   created_at: string;
   updated_at: string;
 }

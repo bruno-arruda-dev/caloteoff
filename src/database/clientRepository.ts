@@ -3,11 +3,20 @@ import { AddressContact, BillingCycle, Client, LimitPolicy, PhoneContact, SortOp
 import { calculateNextBillingDate, getDaysDiffFromToday, getTodayISO } from '../utils/date';
 import { getDatabase } from './schema';
 
+export interface GetClientsOptions {
+  status?: 'all' | 'active' | 'deleted';
+  page?: number;
+  pageSize?: number;
+}
+
 export async function getClients(
   sortOption: SortOption = 'collection_queue',
-  searchQuery?: string
+  searchQuery?: string,
+  options?: GetClientsOptions
 ): Promise<Client[]> {
   const db = await getDatabase();
+
+  const status = options?.status ?? 'active';
 
   let query = `
     SELECT 
@@ -15,12 +24,20 @@ export async function getClients(
       COALESCE((SELECT SUM(amount) FROM entries WHERE client_id = c.id AND status = 'pending'), 0) as total_pending_debits,
       (SELECT MIN(due_date) FROM entries WHERE client_id = c.id AND status = 'pending') as oldest_pending_date
     FROM clients c
+    WHERE 1=1
   `;
 
   const params: any[] = [];
+
+  if (status === 'active') {
+    query += ` AND c.deleted_at IS NULL`;
+  } else if (status === 'deleted') {
+    query += ` AND c.deleted_at IS NOT NULL`;
+  }
+
   if (searchQuery && searchQuery.trim().length > 0) {
     const pattern = `%${searchQuery.trim().toLowerCase()}%`;
-    query += ` WHERE LOWER(c.name) LIKE ? OR LOWER(c.nickname) LIKE ? OR c.whatsapp_primary LIKE ?`;
+    query += ` AND (LOWER(c.name) LIKE ? OR LOWER(c.nickname) LIKE ? OR c.whatsapp_primary LIKE ?)`;
     params.push(pattern, pattern, pattern);
   }
 
@@ -61,28 +78,30 @@ export async function getClients(
       current_balance: currentBalance,
       credit_balance: creditBalance,
       next_billing_date: nextBillingDate,
+      deleted_at: r.deleted_at || null,
       created_at: r.created_at,
       updated_at: r.updated_at,
       oldest_pending_date: r.oldest_pending_date || undefined,
     };
   });
 
-  // Aplicação da Ordenação
-  return sortClientsList(clients, sortOption);
+  const sorted = sortClientsList(clients, sortOption);
+
+  // Paginação se informada
+  if (options?.page && options?.pageSize) {
+    const start = (options.page - 1) * options.pageSize;
+    return sorted.slice(start, start + options.pageSize);
+  }
+
+  return sorted;
 }
 
 function sortClientsList(
   clients: (Client & { oldest_pending_date?: string })[],
   sortOption: SortOption
 ): Client[] {
-  const today = getTodayISO();
-
   switch (sortOption) {
     case 'collection_queue': {
-      // 1. Inadimplentes (data passou, mais atrasados primeiro)
-      // 2. Cobra Hoje
-      // 3. Próximos dias
-      // 4. Sem dívida (zerados / credores no final)
       return [...clients].sort((a, b) => {
         const aHasDebt = a.current_balance > 0;
         const bHasDebt = b.current_balance > 0;
@@ -93,24 +112,17 @@ function sortClientsList(
         const aDiff = getDaysDiffFromToday(a.next_billing_date);
         const bDiff = getDaysDiffFromToday(b.next_billing_date);
 
-        // aDiff > 0 significa atrasado por N dias
         const aOverdue = aDiff > 0;
         const bOverdue = bDiff > 0;
 
         if (aOverdue && !bOverdue) return -1;
         if (!aOverdue && bOverdue) return 1;
-        if (aOverdue && bOverdue) {
-          // Maior atraso primeiro
-          return bDiff - aDiff;
-        }
+        if (aOverdue && bOverdue) return bDiff - aDiff;
 
-        const aToday = aDiff === 0;
-        const bToday = bDiff === 0;
-        if (aToday && !bToday) return -1;
-        if (!aToday && bToday) return 1;
+        if (aDiff === 0 && bDiff !== 0) return -1;
+        if (aDiff !== 0 && bDiff === 0) return 1;
 
-        // Ambos no futuro: data mais próxima primeiro
-        return a.next_billing_date.localeCompare(b.next_billing_date);
+        return b.current_balance - a.current_balance;
       });
     }
 
@@ -118,18 +130,29 @@ function sortClientsList(
       return [...clients].sort((a, b) => b.current_balance - a.current_balance);
 
     case 'lowest_debt':
-      return [...clients].sort((a, b) => a.current_balance - b.current_balance);
+      return [...clients].sort((a, b) => {
+        if (a.current_balance <= 0 && b.current_balance > 0) return 1;
+        if (a.current_balance > 0 && b.current_balance <= 0) return -1;
+        return a.current_balance - b.current_balance;
+      });
 
     case 'oldest_purchase':
       return [...clients].sort((a, b) => {
-        if (!a.oldest_pending_date) return 1;
-        if (!b.oldest_pending_date) return -1;
-        return a.oldest_pending_date.localeCompare(b.oldest_pending_date);
+        if (!a.oldest_pending_date && b.oldest_pending_date) return 1;
+        if (a.oldest_pending_date && !b.oldest_pending_date) return -1;
+        if (a.oldest_pending_date && b.oldest_pending_date) {
+          return a.oldest_pending_date.localeCompare(b.oldest_pending_date);
+        }
+        return b.current_balance - a.current_balance;
       });
 
     case 'alphabetical':
+      return [...clients].sort((a, b) =>
+        (a.nickname || a.name).localeCompare(b.nickname || b.name, 'pt-BR')
+      );
+
     default:
-      return [...clients].sort((a, b) => (a.nickname || a.name).localeCompare(b.nickname || b.name));
+      return clients;
   }
 }
 
@@ -137,9 +160,10 @@ export async function getClientById(id: string): Promise<Client | null> {
   const db = await getDatabase();
   const r = await db.getFirstAsync<any>(
     `SELECT 
-      c.*,
-      COALESCE((SELECT SUM(amount) FROM entries WHERE client_id = c.id AND status = 'pending'), 0) as total_pending_debits
-    FROM clients c WHERE c.id = ?`,
+       c.*,
+       COALESCE((SELECT SUM(amount) FROM entries WHERE client_id = c.id AND status = 'pending'), 0) as total_pending_debits
+     FROM clients c 
+     WHERE c.id = ?`,
     [id]
   );
 
@@ -179,6 +203,7 @@ export async function getClientById(id: string): Promise<Client | null> {
     current_balance: currentBalance,
     credit_balance: creditBalance,
     next_billing_date: nextBillingDate,
+    deleted_at: r.deleted_at || null,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -204,8 +229,8 @@ export async function createClient(data: {
     `INSERT INTO clients (
       id, name, nickname, whatsapp_primary, phones_json, addresses_json,
       credit_limit, limit_policy, billing_cycle, billing_day, notes,
-      credit_balance, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      credit_balance, deleted_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
     [
       id,
       data.name.trim(),
@@ -242,6 +267,7 @@ export async function updateClient(
     billing_day: number;
     notes: string;
     credit_balance: number;
+    deleted_at: string | null;
   }>
 ): Promise<Client> {
   const db = await getDatabase();
@@ -263,6 +289,7 @@ export async function updateClient(
       billing_day = ?,
       notes = ?,
       credit_balance = ?,
+      deleted_at = ?,
       updated_at = ?
      WHERE id = ?`,
     [
@@ -277,6 +304,7 @@ export async function updateClient(
       data.billing_day !== undefined ? data.billing_day : current.billing_day,
       data.notes !== undefined ? data.notes : current.notes,
       data.credit_balance !== undefined ? data.credit_balance : current.credit_balance,
+      data.deleted_at !== undefined ? data.deleted_at : current.deleted_at,
       now,
       id,
     ]
@@ -287,9 +315,24 @@ export async function updateClient(
   return updated;
 }
 
+/**
+ * Delete Lógico (Soft Delete):
+ * O cliente é marcado com deleted_at = data atual.
+ * Não pode mais realizar compras fiadas, mas as mensagerias e pagamentos continuam funcionando normalmente.
+ */
 export async function deleteClient(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM clients WHERE id = ?', [id]);
+  const now = new Date().toISOString();
+  await db.runAsync('UPDATE clients SET deleted_at = ?, updated_at = ? WHERE id = ?', [now, now, id]);
+}
+
+/**
+ * Restaura um cliente que estava desativado/arquivado
+ */
+export async function restoreClient(id: string): Promise<void> {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+  await db.runAsync('UPDATE clients SET deleted_at = NULL, updated_at = ? WHERE id = ?', [now, id]);
 }
 
 export async function countActiveDebtorClients(): Promise<number> {
@@ -298,7 +341,7 @@ export async function countActiveDebtorClients(): Promise<number> {
     SELECT count(DISTINCT c.id) as count
     FROM clients c
     JOIN entries e ON e.client_id = c.id AND e.status = 'pending'
-    WHERE (e.amount - c.credit_balance) > 0
+    WHERE c.deleted_at IS NULL AND (e.amount - c.credit_balance) > 0
   `);
   return row ? row.count : 0;
 }

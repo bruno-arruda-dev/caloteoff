@@ -125,59 +125,29 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* Ações Rápidas do Card */}
-      <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+      {/* Barra de Penduras / Accordion */}
+      {openDebits.length > 0 && (
         <TouchableOpacity
-          style={[styles.accordionToggle, { backgroundColor: theme.cardSecondary }]}
+          style={[
+            styles.accordionBar,
+            { borderTopColor: theme.borderLight, backgroundColor: theme.cardSecondary },
+          ]}
           onPress={() => setExpanded(!expanded)}
           activeOpacity={0.7}
         >
+          <View style={styles.accordionBarLeft}>
+            <Ionicons name="receipt-outline" size={14} color={theme.textSecondary} />
+            <Text style={[styles.accordionBarText, { color: theme.textSecondary }]}>
+              {openDebits.length} {openDebits.length === 1 ? 'pendura em aberto' : 'penduras em aberto'}
+            </Text>
+          </View>
           <Ionicons
             name={expanded ? 'chevron-up' : 'chevron-down'}
             size={16}
-            color={theme.textSecondary}
+            color={theme.textMuted}
           />
-          <Text style={[styles.accordionToggleText, { color: theme.textSecondary }]}>
-            {openDebits.length} {openDebits.length === 1 ? 'pendura' : 'penduras'}
-          </Text>
         </TouchableOpacity>
-
-        <View style={styles.buttonGroup}>
-          {isDebtor && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#25D366' }]}
-              onPress={() => onCobrarZap(client)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-whatsapp" size={14} color="#FFFFFF" />
-              <Text style={styles.actionBtnText}>Cobrar no Zap</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              { backgroundColor: isDebtor ? theme.primary : theme.cardSecondary },
-            ]}
-            onPress={() => onPassarRegua(client)}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="checkmark-done"
-              size={14}
-              color={isDebtor ? theme.primaryText : theme.textPrimary}
-            />
-            <Text
-              style={[
-                styles.actionBtnText,
-                { color: isDebtor ? theme.primaryText : theme.textPrimary },
-              ]}
-            >
-              Passar a régua
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      )}
 
       {/* Accordion de Lançamentos em Aberto */}
       {expanded && (
@@ -221,16 +191,53 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           )}
         </View>
       )}
+
+      {/* Ações Rápidas do Card (Dois Botões 50% / 50% com visual limpo e sem cortes) */}
+      <View style={[styles.actionsRow, { borderTopColor: theme.borderLight }]}>
+        {isDebtor ? (
+          <>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#25D366' }]}
+              onPress={() => onCobrarZap(client)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-whatsapp" size={16} color="#FFFFFF" />
+              <Text style={styles.actionBtnText}>Cobrar no Zap</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+              onPress={() => onPassarRegua(client)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-done" size={16} color={theme.primaryText} />
+              <Text style={[styles.actionBtnText, { color: theme.primaryText }]}>
+                Passar a Régua
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={[styles.actionBtnFull, { backgroundColor: theme.cardSecondary }]}
+            onPress={() => onOpenDetails(client)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="eye-outline" size={16} color={theme.textPrimary} />
+            <Text style={[styles.actionBtnText, { color: theme.textPrimary }]}>
+              Ver Ficha e Histórico
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     marginBottom: 12,
-    marginHorizontal: 16,
     overflow: 'hidden',
   },
   cardHeader: {
@@ -296,43 +303,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  actionsRow: {
-    borderTopWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  accordionBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderTopWidth: 1,
   },
-  accordionToggle: {
+  accordionBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
+    gap: 6,
   },
-  accordionToggleText: {
+  accordionBarText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-    gap: 5,
-  },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
   },
   accordionBody: {
     borderTopWidth: 1,
@@ -369,6 +355,36 @@ const styles = StyleSheet.create({
   },
   debitAmount: {
     fontSize: 14,
+    fontWeight: '700',
+  },
+  actionsRow: {
+    borderTopWidth: 1,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionBtnFull: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
   },
 });
