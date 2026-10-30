@@ -17,8 +17,9 @@ import { isBiometricsAvailable, authenticateWithBiometrics } from '../services/a
 import { getSetting, setSetting } from '../database/settingsRepository';
 import { exportBackup, pickAndRestoreBackup } from '../services/backupService';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../services/notificationService';
+import { LimitPolicy } from '../types';
 
-const APP_VERSION_STRING = 'v1.0.1 (Build 2)';
+const APP_VERSION_STRING = 'v1.0.2 (Build 3)';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -51,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [biometricsEnabled, setBiometricsEnabled] = useState<boolean>(false);
   const [hasBiometricHardware, setHasBiometricHardware] = useState<boolean>(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [globalLimitPolicy, setGlobalLimitPolicy] = useState<LimitPolicy>('AVISAR_E_PERMITIR');
   const devTapCountRef = useRef<number>(0);
 
   useEffect(() => {
@@ -70,9 +72,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
       const notifPerm = await getNotificationPermissionStatus();
       setNotificationsEnabled(notifPerm.granted);
+
+      const limitPol = await getSetting('global_limit_policy', 'AVISAR_E_PERMITIR');
+      setGlobalLimitPolicy(limitPol as LimitPolicy);
     } catch (err) {
       console.warn('Erro ao carregar configurações:', err);
     }
+  };
+
+  const handleSetGlobalLimitPolicy = async (val: LimitPolicy) => {
+    setGlobalLimitPolicy(val);
+    await setSetting('global_limit_policy', val);
   };
 
   const handleVersionTap = async () => {
@@ -293,6 +303,121 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Ocultar Total (••••••)
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            {/* POLÍTICA GLOBAL DE LIMITE DE CRÉDITO */}
+            <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
+              POLÍTICA DE LIMITE DE FIADO (GERAL)
+            </Text>
+            <View
+              style={[
+                styles.policyContainer,
+                { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight },
+              ]}
+            >
+              <View style={styles.policyHeaderRow}>
+                <View style={[styles.itemIcon, { backgroundColor: theme.primaryBg }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={theme.primary} />
+                </View>
+                <View style={styles.itemTextCol}>
+                  <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
+                    Se o cliente estourar o limite:
+                  </Text>
+                  <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
+                    Regra padrão do app (a regra do cliente tem prioridade)
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.policyBtnRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.policyChoiceBtn,
+                    {
+                      backgroundColor:
+                        globalLimitPolicy === 'AVISAR_E_PERMITIR'
+                          ? theme.primary
+                          : theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => handleSetGlobalLimitPolicy('AVISAR_E_PERMITIR')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={
+                      globalLimitPolicy === 'AVISAR_E_PERMITIR'
+                        ? 'checkmark-circle'
+                        : 'ellipse-outline'
+                    }
+                    size={16}
+                    color={
+                      globalLimitPolicy === 'AVISAR_E_PERMITIR'
+                        ? theme.primaryText
+                        : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.policyChoiceText,
+                      {
+                        color:
+                          globalLimitPolicy === 'AVISAR_E_PERMITIR'
+                            ? theme.primaryText
+                            : theme.textSecondary,
+                        fontWeight:
+                          globalLimitPolicy === 'AVISAR_E_PERMITIR' ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    Avisar e Permitir
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.policyChoiceBtn,
+                    {
+                      backgroundColor:
+                        globalLimitPolicy === 'BLOQUEAR_TOTAL'
+                          ? theme.expense
+                          : theme.surface,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  onPress={() => handleSetGlobalLimitPolicy('BLOQUEAR_TOTAL')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={
+                      globalLimitPolicy === 'BLOQUEAR_TOTAL'
+                        ? 'close-circle'
+                        : 'ellipse-outline'
+                    }
+                    size={16}
+                    color={
+                      globalLimitPolicy === 'BLOQUEAR_TOTAL'
+                        ? '#FFFFFF'
+                        : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.policyChoiceText,
+                      {
+                        color:
+                          globalLimitPolicy === 'BLOQUEAR_TOTAL'
+                            ? '#FFFFFF'
+                            : theme.textSecondary,
+                        fontWeight:
+                          globalLimitPolicy === 'BLOQUEAR_TOTAL' ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    Bloquear Total
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* NOTIFICAÇÕES */}
@@ -612,6 +737,36 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   devResetBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  policyContainer: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  policyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  policyBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  policyChoiceBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  policyChoiceText: {
     fontSize: 12,
     fontWeight: '600',
   },

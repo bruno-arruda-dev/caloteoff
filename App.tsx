@@ -55,7 +55,7 @@ function MainScreen() {
   // Estados principais
   const [clients, setClients] = useState<Client[]>([]);
   const [openDebitsMap, setOpenDebitsMap] = useState<Record<string, DebitEntry[]>>({});
-  const [tradeName, setTradeName] = useState<string>('CaloteOff');
+  const [tradeName, setTradeName] = useState<string>('Irineu');
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
@@ -98,7 +98,7 @@ function MainScreen() {
         getBusinessProfile(),
       ]);
       setClients(list);
-      setTradeName(profile.trade_name || 'CaloteOff');
+      setTradeName(profile.trade_name || 'Irineu');
       setLogoUri(profile.logo_uri);
 
       // Carrega débitos abertos para os cards
@@ -185,7 +185,7 @@ function MainScreen() {
           </TouchableOpacity>
 
           <View style={styles.topTitleBox}>
-            <Text style={[styles.appName, { color: theme.primary }]}>CaloteOff</Text>
+            <Text style={[styles.appName, { color: theme.primary }]}>Irineu</Text>
             <Text style={[styles.tradeNameSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
               {tradeName}
             </Text>
@@ -235,16 +235,6 @@ function MainScreen() {
               size={19}
               color={privacyEnabled ? theme.primary : theme.textSecondary}
             />
-          </TouchableOpacity>
-
-          {/* Alternar Tema Rápido */}
-          <TouchableOpacity
-            style={[styles.topIconBtn, { backgroundColor: theme.cardSecondary }]}
-            onPress={cycleTheme}
-            activeOpacity={0.7}
-            accessibilityLabel="Mudar tema"
-          >
-            <Ionicons name="contrast-outline" size={19} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>

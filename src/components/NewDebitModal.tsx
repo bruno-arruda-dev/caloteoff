@@ -19,6 +19,7 @@ import { formatCurrency, parseCurrencyInput } from '../utils/currency';
 import { formatDateBR, getTodayISO } from '../utils/date';
 import { checkCreditLimit } from '../utils/balanceCalculator';
 import { addDebitEntry } from '../database/entryRepository';
+import { getSetting } from '../database/settingsRepository';
 import { DatePickerField } from './DatePickerField';
 
 interface NewDebitModalProps {
@@ -112,12 +113,18 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
       return;
     }
 
-    // Checagem de Limite
+    // Checagem de Limite: regra do cliente tem prioridade; se PADRAO_GLOBAL, usa a geral das configurações
+    let effectivePolicy = selectedClient.limit_policy;
+    if (!effectivePolicy || effectivePolicy === 'PADRAO_GLOBAL') {
+      const globalPol = await getSetting('global_limit_policy', 'AVISAR_E_PERMITIR');
+      effectivePolicy = globalPol as any;
+    }
+
     const limitCheck = checkCreditLimit(
       selectedClient.current_balance,
       amount,
       selectedClient.credit_limit,
-      selectedClient.limit_policy
+      effectivePolicy
     );
 
     if (limitCheck.isExceeded) {

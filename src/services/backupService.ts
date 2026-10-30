@@ -52,7 +52,7 @@ export async function exportBackup(userPassword?: string): Promise<{ success: bo
     const encryptedFileContent = JSON.stringify(encryptedContainer, null, 2);
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const fileName = `caloteoff_backup_${timestamp}.caloteoff`;
+    const fileName = `irineu_backup_${timestamp}.irineu`;
 
     const backupFile = new File(Paths.document, fileName);
     if (!backupFile.exists) {
@@ -63,7 +63,7 @@ export async function exportBackup(userPassword?: string): Promise<{ success: bo
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(backupFile.uri, {
         mimeType: 'application/octet-stream',
-        dialogTitle: 'Exportar Backup do CaloteOff',
+        dialogTitle: 'Exportar Backup do Irineu',
         UTI: 'public.data',
       });
     }
@@ -101,7 +101,7 @@ export async function pickAndRestoreBackup(
     try {
       container = JSON.parse(fileContent);
     } catch {
-      return { success: false, error: 'O arquivo selecionado não é um backup válido do CaloteOff.' };
+      return { success: false, error: 'O arquivo selecionado não é um backup válido do Irineu.' };
     }
 
     if (container.hasPassword && !userPassword) {

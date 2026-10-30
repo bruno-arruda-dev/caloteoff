@@ -148,6 +148,30 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_entries_due_date ON entries(due_date);
     CREATE INDEX IF NOT EXISTS idx_payments_client ON payments(client_id);
     CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
+
+    -- Telefones dos Clientes (Tabela Própria para Múltiplos Números)
+    CREATE TABLE IF NOT EXISTS client_phones (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      label TEXT NOT NULL DEFAULT 'Celular',
+      number TEXT NOT NULL,
+      is_whatsapp INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_phones_client_id ON client_phones(client_id);
+
+    -- Endereços dos Clientes (Tabela Própria para Múltiplos Endereços)
+    CREATE TABLE IF NOT EXISTS client_addresses (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      label TEXT NOT NULL DEFAULT 'Principal',
+      street TEXT NOT NULL,
+      number TEXT NOT NULL DEFAULT '',
+      neighborhood TEXT NOT NULL DEFAULT '',
+      reference TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_addresses_client_id ON client_addresses(client_id);
   `);
 
   // Migração segura para adicionar coluna deleted_at caso a tabela já exista
@@ -155,6 +179,35 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
     await db.runAsync('ALTER TABLE clients ADD COLUMN deleted_at TEXT;');
   } catch {
     // Coluna já existe
+  }
+
+  // Migração segura para tabelas próprias de telefones e endereços
+  try {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS client_phones (
+        id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        label TEXT NOT NULL DEFAULT 'Celular',
+        number TEXT NOT NULL,
+        is_whatsapp INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_client_phones_client_id ON client_phones(client_id);
+
+      CREATE TABLE IF NOT EXISTS client_addresses (
+        id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        label TEXT NOT NULL DEFAULT 'Principal',
+        street TEXT NOT NULL,
+        number TEXT NOT NULL DEFAULT '',
+        neighborhood TEXT NOT NULL DEFAULT '',
+        reference TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_client_addresses_client_id ON client_addresses(client_id);
+    `);
+  } catch {
+    // Tabelas já existem
   }
 
   // Semente do Perfil do Negócio Inicial se vazio

@@ -24,7 +24,7 @@ export const PaywallModal: React.FC = () => {
     setLoading(true);
     try {
       await purchasePlan(selectedPlan);
-      Alert.alert('Parabéns! 🎉', 'Você agora é um assinante CaloteOff PRO!');
+      Alert.alert('Parabéns! 🎉', 'Você agora é um assinante Irineu PRO!');
     } catch {
       Alert.alert('Erro', 'Não foi possível concluir a ativação.');
     } finally {
@@ -60,7 +60,7 @@ export const PaywallModal: React.FC = () => {
                 <Ionicons name="star" size={36} color={theme.warning} />
               </View>
               <Text style={[styles.title, { color: theme.textPrimary }]}>
-                {triggerInfo?.title || 'Seja CaloteOff PRO'}
+                {triggerInfo?.title || 'Seja Irineu PRO'}
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 {triggerInfo?.description ||

@@ -11,7 +11,7 @@ export async function isBiometricsAvailable(): Promise<boolean> {
 }
 
 export async function authenticateWithBiometrics(
-  promptMessage: string = 'Autentique-se para acessar o CaloteOff'
+  promptMessage: string = 'Autentique-se para acessar o Irineu'
 ): Promise<boolean> {
   try {
     const isAvailable = await isBiometricsAvailable();

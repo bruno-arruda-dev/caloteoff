@@ -156,6 +156,98 @@ function sortClientsList(
   }
 }
 
+export async function getClientPhones(clientId: string): Promise<PhoneContact[]> {
+  try {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ id: string; label: string; number: string }>(
+      'SELECT id, label, number FROM client_phones WHERE client_id = ? ORDER BY created_at ASC',
+      [clientId]
+    );
+    return rows.map((r) => ({ id: r.id, label: r.label, number: r.number }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getClientAddresses(clientId: string): Promise<AddressContact[]> {
+  try {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{
+      id: string;
+      label: string;
+      street: string;
+      number: string;
+      neighborhood: string;
+      reference: string;
+    }>(
+      'SELECT id, label, street, number, neighborhood, reference FROM client_addresses WHERE client_id = ? ORDER BY created_at ASC',
+      [clientId]
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      label: r.label,
+      street: r.street,
+      number: r.number,
+      neighborhood: r.neighborhood,
+      reference: r.reference,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function saveClientPhonesInternal(
+  db: any,
+  clientId: string,
+  phones: PhoneContact[]
+): Promise<void> {
+  try {
+    await db.runAsync('DELETE FROM client_phones WHERE client_id = ?', [clientId]);
+    const now = new Date().toISOString();
+    for (const p of phones) {
+      if (!p.number || !p.number.trim()) continue;
+      const phoneId = p.id || `ph-${Crypto.randomUUID()}`;
+      await db.runAsync(
+        'INSERT INTO client_phones (id, client_id, label, number, is_whatsapp, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+        [phoneId, clientId, p.label || 'Celular', p.number.trim(), now]
+      );
+    }
+  } catch (err) {
+    console.warn('Erro ao salvar client_phones:', err);
+  }
+}
+
+async function saveClientAddressesInternal(
+  db: any,
+  clientId: string,
+  addresses: AddressContact[]
+): Promise<void> {
+  try {
+    await db.runAsync('DELETE FROM client_addresses WHERE client_id = ?', [clientId]);
+    const now = new Date().toISOString();
+    for (const a of addresses) {
+      if (!a.street || !a.street.trim()) continue;
+      const addrId = a.id || `addr-${Crypto.randomUUID()}`;
+      await db.runAsync(
+        `INSERT INTO client_addresses (id, client_id, label, street, number, neighborhood, reference, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          addrId,
+          clientId,
+          a.label || 'Principal',
+          a.street.trim(),
+          a.number || '',
+          a.neighborhood || '',
+          a.reference || '',
+          now,
+        ]
+      );
+    }
+  } catch (err) {
+    console.warn('Erro ao salvar client_addresses:', err);
+  }
+}
+
 export async function getClientById(id: string): Promise<Client | null> {
   const db = await getDatabase();
   const r = await db.getFirstAsync<any>(
@@ -179,6 +271,13 @@ export async function getClientById(id: string): Promise<Client | null> {
     addresses = JSON.parse(r.addresses_json || '[]');
   } catch {}
 
+  const [tablePhones, tableAddresses] = await Promise.all([
+    getClientPhones(id),
+    getClientAddresses(id),
+  ]);
+  const finalPhones = tablePhones.length > 0 ? tablePhones : phones;
+  const finalAddresses = tableAddresses.length > 0 ? tableAddresses : addresses;
+
   const totalPending = Number(r.total_pending_debits || 0);
   const creditBalance = Number(r.credit_balance || 0);
   const currentBalance = Math.round((totalPending - creditBalance) * 100) / 100;
@@ -193,8 +292,8 @@ export async function getClientById(id: string): Promise<Client | null> {
     name: r.name,
     nickname: r.nickname,
     whatsapp_primary: r.whatsapp_primary,
-    phones,
-    addresses,
+    phones: finalPhones,
+    addresses: finalAddresses,
     credit_limit: r.credit_limit !== null ? Number(r.credit_limit) : null,
     limit_policy: r.limit_policy as LimitPolicy,
     billing_cycle: r.billing_cycle as BillingCycle,
@@ -250,7 +349,15 @@ export async function createClient(data: {
 
   const created = await getClientById(id);
   if (!created) throw new Error('Falha ao obter cliente criado');
-  return created;
+
+  const phonesList = data.phones || [];
+  const addressesList = data.addresses || [];
+  await Promise.all([
+    saveClientPhonesInternal(db, id, phonesList),
+    saveClientAddressesInternal(db, id, addressesList),
+  ]);
+
+  return (await getClientById(id)) || created;
 }
 
 export async function updateClient(
@@ -309,6 +416,13 @@ export async function updateClient(
       id,
     ]
   );
+
+  if (data.phones !== undefined) {
+    await saveClientPhonesInternal(db, id, data.phones);
+  }
+  if (data.addresses !== undefined) {
+    await saveClientAddressesInternal(db, id, data.addresses);
+  }
 
   const updated = await getClientById(id);
   if (!updated) throw new Error('Falha ao atualizar cliente');

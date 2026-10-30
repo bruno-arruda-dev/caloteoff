@@ -1,4 +1,4 @@
-export type LimitPolicy = 'AVISAR_E_PERMITIR' | 'BLOQUEAR_TOTAL';
+export type LimitPolicy = 'AVISAR_E_PERMITIR' | 'BLOQUEAR_TOTAL' | 'PADRAO_GLOBAL';
 export type BillingCycle = 'WEEKLY' | 'MONTHLY';
 
 export type PixKeyType = 'CPF' | 'CNPJ' | 'PHONE' | 'EMAIL' | 'RANDOM';
@@ -30,6 +30,7 @@ export interface PhoneContact {
 
 export interface AddressContact {
   id: string;
+  label?: string;
   street: string;
   number: string;
   neighborhood: string;

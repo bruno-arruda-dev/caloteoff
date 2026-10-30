@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "CaloteOff",
-    "slug": "caloteoff",
-    "version": "1.0.1",
+    "name": "Irineu",
+    "slug": "irineu",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.particular.caloteoff",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#EEF2FF",
         "foregroundImage": "./assets/android-icon-foreground.png",

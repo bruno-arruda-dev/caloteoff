@@ -86,10 +86,10 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   };
 
   const handleAction = (callback: () => void) => {
-    handleClose();
+    onClose();
     setTimeout(() => {
       callback();
-    }, 220);
+    }, 150);
   };
 
   if (!visible) return null;
@@ -99,6 +99,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
       <View style={styles.container}>
         {/* Backdrop escurecido */}
         <Animated.View
+          pointerEvents="none"
           style={[
             styles.backdrop,
             {
@@ -106,22 +107,21 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
               opacity: fadeAnim,
             },
           ]}
-        >
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose} />
-        </Animated.View>
+        />
 
-        {/* Gaveta Lateral Deslizante */}
-        <Animated.View
-          style={[
-            styles.drawer,
-            {
-              backgroundColor: theme.card,
-              borderRightColor: theme.border,
-              transform: [{ translateX: slideAnim }],
-            },
-          ]}
-        >
-          {/* Topo do Menu com Marca e Fechar */}
+        <View style={styles.contentRow}>
+          {/* Gaveta Lateral Deslizante */}
+          <Animated.View
+            style={[
+              styles.drawer,
+              {
+                backgroundColor: theme.card,
+                borderRightColor: theme.border,
+                transform: [{ translateX: slideAnim }],
+              },
+            ]}
+          >
+            {/* Topo do Menu com Marca e Fechar */}
           <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
             <View style={styles.headerBrand}>
               {logoUri ? (
@@ -133,7 +133,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
               )}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.appName, { color: theme.textPrimary }]} numberOfLines={1}>
-                  {tradeName || 'CaloteOff'}
+                  {tradeName || 'Irineu'}
                 </Text>
                 <Text style={[styles.appSubtitle, { color: theme.textMuted }]}>
                   Offline • Fiado no Zap
@@ -284,14 +284,20 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
             </Text>
           </View>
         </Animated.View>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
       </View>
-    </Modal>
+    </View>
+  </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  contentRow: {
+    flex: 1,
+    flexDirection: 'row',
   },
   backdrop: {
     position: 'absolute',
@@ -303,6 +309,7 @@ const styles = StyleSheet.create({
   drawer: {
     width: DRAWER_WIDTH,
     height: '100%',
+    zIndex: 10,
     borderRightWidth: 1,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ? StatusBar.currentHeight + 8 : 36) : 48,
     shadowColor: '#000000',

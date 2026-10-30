@@ -38,10 +38,12 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [nickname, setNickname] = useState<string>('');
   const [whatsapp, setWhatsapp] = useState<string>('');
   const [limitRaw, setLimitRaw] = useState<string>('');
-  const [limitPolicy, setLimitPolicy] = useState<LimitPolicy>('AVISAR_E_PERMITIR');
+  const [limitPolicy, setLimitPolicy] = useState<LimitPolicy>('PADRAO_GLOBAL');
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('MONTHLY');
   const [billingDay, setBillingDay] = useState<string>('10');
   const [notes, setNotes] = useState<string>('');
+  const [phones, setPhones] = useState<PhoneContact[]>([]);
+  const [addresses, setAddresses] = useState<AddressContact[]>([]);
   const [showMore, setShowMore] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -52,20 +54,24 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         setNickname(client.nickname);
         setWhatsapp(client.whatsapp_primary);
         setLimitRaw(client.credit_limit ? client.credit_limit.toFixed(2).replace('.', ',') : '');
-        setLimitPolicy(client.limit_policy);
+        setLimitPolicy(client.limit_policy || 'PADRAO_GLOBAL');
         setBillingCycle(client.billing_cycle);
         setBillingDay(String(client.billing_day));
         setNotes(client.notes || '');
+        setPhones(client.phones ? JSON.parse(JSON.stringify(client.phones)) : []);
+        setAddresses(client.addresses ? JSON.parse(JSON.stringify(client.addresses)) : []);
         setShowMore(true);
       } else {
         setName('');
         setNickname('');
         setWhatsapp('');
         setLimitRaw('');
-        setLimitPolicy('AVISAR_E_PERMITIR');
+        setLimitPolicy('PADRAO_GLOBAL');
         setBillingCycle('MONTHLY');
         setBillingDay('10');
         setNotes('');
+        setPhones([]);
+        setAddresses([]);
         setShowMore(false);
       }
     }
@@ -98,6 +104,25 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     const limitVal = parseCurrencyInput(limitRaw);
     const bDayVal = parseInt(billingDay, 10) || (billingCycle === 'WEEKLY' ? 1 : 10);
 
+    const validPhones = phones
+      .map((p) => ({
+        id: p.id || `ph-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        label: p.label || 'Celular',
+        number: p.number.trim(),
+      }))
+      .filter((p) => p.number.length > 0);
+
+    const validAddresses = addresses
+      .map((a) => ({
+        id: a.id || `addr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        label: a.label || 'Principal',
+        street: a.street.trim(),
+        number: a.number.trim(),
+        neighborhood: a.neighborhood.trim(),
+        reference: a.reference.trim(),
+      }))
+      .filter((a) => a.street.length > 0);
+
     setLoading(true);
     try {
       if (client) {
@@ -105,6 +130,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           name,
           nickname: nickname.trim() || name.trim(),
           whatsapp_primary: whatsapp,
+          phones: validPhones,
+          addresses: validAddresses,
           credit_limit: limitVal > 0 ? limitVal : null,
           limit_policy: limitPolicy,
           billing_cycle: billingCycle,
@@ -117,6 +144,8 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           name,
           nickname: nickname.trim() || name.trim(),
           whatsapp_primary: whatsapp,
+          phones: validPhones,
+          addresses: validAddresses,
           credit_limit: limitVal > 0 ? limitVal : null,
           limit_policy: limitPolicy,
           billing_cycle: billingCycle,
@@ -274,6 +303,34 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                         styles.policyOption,
                         {
                           backgroundColor:
+                            limitPolicy === 'PADRAO_GLOBAL'
+                              ? theme.primary
+                              : theme.cardSecondary,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      onPress={() => setLimitPolicy('PADRAO_GLOBAL')}
+                    >
+                      <Text
+                        style={[
+                          styles.policyText,
+                          {
+                            color:
+                              limitPolicy === 'PADRAO_GLOBAL'
+                                ? theme.primaryText
+                                : theme.textSecondary,
+                          },
+                        ]}
+                      >
+                        Padrão do App
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.policyOption,
+                        {
+                          backgroundColor:
                             limitPolicy === 'AVISAR_E_PERMITIR'
                               ? theme.primary
                               : theme.cardSecondary,
@@ -293,7 +350,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                           },
                         ]}
                       >
-                        Avisar e Permitir
+                        Avisar
                       </Text>
                     </TouchableOpacity>
 
@@ -319,7 +376,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                           },
                         ]}
                       >
-                        Bloquear Total
+                        Bloquear
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -411,7 +468,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 {/* Anotações Gerais */}
                 <View style={styles.fieldGroup}>
                   <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Anotações Gerais / Endereço / Referência
+                    Anotações Gerais
                   </Text>
                   <TextInput
                     style={[
@@ -422,7 +479,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                         color: theme.textPrimary,
                       },
                     ]}
-                    placeholder="Ex: Mora perto da praça, entregar após as 18h..."
+                    placeholder="Ex: Parente do seu Zé, entregar após as 18h..."
                     placeholderTextColor={theme.textMuted}
                     multiline
                     numberOfLines={3}
@@ -430,6 +487,254 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     onChangeText={setNotes}
                   />
                 </View>
+
+                {/* Telefones Adicionais */}
+                <View style={styles.sectionHeaderRow}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <Ionicons name="call-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+                      Outros Telefones ({phones.length})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.addInlineBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                    onPress={() => {
+                      setPhones([
+                        ...phones,
+                        {
+                          id: `ph-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                          label: 'Celular',
+                          number: '',
+                        },
+                      ]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color={theme.primary} />
+                    <Text style={[styles.addInlineBtnText, { color: theme.primary }]}>Adicionar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {phones.map((phone, idx) => (
+                  <View
+                    key={phone.id || idx}
+                    style={[styles.itemCard, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                  >
+                    <View style={styles.itemHeader}>
+                      <View style={styles.labelChipsRow}>
+                        {(['Celular', 'WhatsApp', 'Fixo', 'Recado'] as const).map((l) => (
+                          <TouchableOpacity
+                            key={l}
+                            style={[
+                              styles.miniChip,
+                              {
+                                backgroundColor: phone.label === l ? theme.primary : 'transparent',
+                                borderColor: phone.label === l ? theme.primary : theme.border,
+                              },
+                            ]}
+                            onPress={() => {
+                              const next = [...phones];
+                              next[idx].label = l;
+                              setPhones(next);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.miniChipText,
+                                { color: phone.label === l ? theme.primaryText : theme.textSecondary },
+                              ]}
+                            >
+                              {l}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setPhones(phones.filter((_, i) => i !== idx))}
+                        style={styles.deleteMiniBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={theme.expense} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                          color: theme.textPrimary,
+                          marginTop: 8,
+                        },
+                      ]}
+                      placeholder="(DDD) 00000-0000"
+                      placeholderTextColor={theme.textMuted}
+                      keyboardType="phone-pad"
+                      value={phone.number}
+                      onChangeText={(val) => {
+                        const next = [...phones];
+                        next[idx].number = val;
+                        setPhones(next);
+                      }}
+                    />
+                  </View>
+                ))}
+
+                {/* Endereços */}
+                <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <Ionicons name="location-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
+                      Endereços ({addresses.length})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.addInlineBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                    onPress={() => {
+                      setAddresses([
+                        ...addresses,
+                        {
+                          id: `addr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                          label: 'Principal',
+                          street: '',
+                          number: '',
+                          neighborhood: '',
+                          reference: '',
+                        },
+                      ]);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add" size={16} color={theme.primary} />
+                    <Text style={[styles.addInlineBtnText, { color: theme.primary }]}>Adicionar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {addresses.map((addr, idx) => (
+                  <View
+                    key={addr.id || idx}
+                    style={[styles.itemCard, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                  >
+                    <View style={styles.itemHeader}>
+                      <View style={styles.labelChipsRow}>
+                        {(['Principal', 'Casa', 'Entrega', 'Trabalho'] as const).map((l) => (
+                          <TouchableOpacity
+                            key={l}
+                            style={[
+                              styles.miniChip,
+                              {
+                                backgroundColor: addr.label === l ? theme.primary : 'transparent',
+                                borderColor: addr.label === l ? theme.primary : theme.border,
+                              },
+                            ]}
+                            onPress={() => {
+                              const next = [...addresses];
+                              next[idx].label = l;
+                              setAddresses(next);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.miniChipText,
+                                { color: addr.label === l ? theme.primaryText : theme.textSecondary },
+                              ]}
+                            >
+                              {l}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setAddresses(addresses.filter((_, i) => i !== idx))}
+                        style={styles.deleteMiniBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={16} color={theme.expense} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                          color: theme.textPrimary,
+                          marginTop: 8,
+                        },
+                      ]}
+                      placeholder="Rua / Avenida / Travessa"
+                      placeholderTextColor={theme.textMuted}
+                      value={addr.street}
+                      onChangeText={(val) => {
+                        const next = [...addresses];
+                        next[idx].street = val;
+                        setAddresses(next);
+                      }}
+                    />
+
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          {
+                            flex: 1,
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                            color: theme.textPrimary,
+                          },
+                        ]}
+                        placeholder="Nº"
+                        placeholderTextColor={theme.textMuted}
+                        value={addr.number}
+                        onChangeText={(val) => {
+                          const next = [...addresses];
+                          next[idx].number = val;
+                          setAddresses(next);
+                        }}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          {
+                            flex: 2,
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                            color: theme.textPrimary,
+                          },
+                        ]}
+                        placeholder="Bairro"
+                        placeholderTextColor={theme.textMuted}
+                        value={addr.neighborhood}
+                        onChangeText={(val) => {
+                          const next = [...addresses];
+                          next[idx].neighborhood = val;
+                          setAddresses(next);
+                        }}
+                      />
+                    </View>
+
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.card,
+                          borderColor: theme.border,
+                          color: theme.textPrimary,
+                          marginTop: 8,
+                        },
+                      ]}
+                      placeholder="Ponto de referência / Instrução de entrega"
+                      placeholderTextColor={theme.textMuted}
+                      value={addr.reference}
+                      onChangeText={(val) => {
+                        const next = [...addresses];
+                        next[idx].reference = val;
+                        setAddresses(next);
+                      }}
+                    />
+                  </View>
+                ))}
               </View>
             )}
           </ScrollView>
@@ -531,6 +836,65 @@ const styles = StyleSheet.create({
   policyText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  addInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  addInlineBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  itemCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  labelChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    flex: 1,
+  },
+  miniChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  miniChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  deleteMiniBtn: {
+    padding: 6,
+    marginLeft: 8,
   },
   textArea: {
     height: 72,

@@ -8,7 +8,8 @@ import { formatDateBR, formatDateTimeBR } from '../utils/date';
 export async function generateClientStatementPdf(
   client: Client,
   entries: DebitEntry[],
-  payments: PaymentRecord[]
+  payments: PaymentRecord[],
+  periodLabel?: string
 ): Promise<string> {
   const profile = await getBusinessProfile();
   const pixKeys = await getPixKeys();
@@ -105,7 +106,8 @@ export async function generateClientStatementPdf(
           </div>
           <div style="text-align: right;">
             <p style="margin: 0; font-size: 12px; font-weight: 700; color: #64748B;">EXTRATO DE CONTA</p>
-            <p style="margin: 4px 0 0 0; font-size: 11px; color: #94A3B8;">Emitido em: ${formatDateBR(new Date().toISOString().slice(0, 10))}</p>
+            <p style="margin: 4px 0 0 0; font-size: 11px; color: ${accentColor}; font-weight: 600;">Período: ${periodLabel || 'Todo o Histórico'}</p>
+            <p style="margin: 2px 0 0 0; font-size: 11px; color: #94A3B8;">Emitido em: ${formatDateBR(new Date().toISOString().slice(0, 10))}</p>
           </div>
         </div>
 
@@ -180,9 +182,10 @@ export async function generateClientStatementPdf(
 export async function shareClientStatementPdf(
   client: Client,
   entries: DebitEntry[],
-  payments: PaymentRecord[]
+  payments: PaymentRecord[],
+  periodLabel?: string
 ): Promise<void> {
-  const uri = await generateClientStatementPdf(client, entries, payments);
+  const uri = await generateClientStatementPdf(client, entries, payments, periodLabel);
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/pdf',

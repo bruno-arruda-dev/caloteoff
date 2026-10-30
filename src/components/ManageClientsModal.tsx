@@ -17,6 +17,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { getClients, deleteClient, restoreClient } from '../database/clientRepository';
 import { formatCurrency } from '../utils/currency';
+import { LimitProgressCircle } from './LimitProgressCircle';
 
 interface ManageClientsModalProps {
   visible: boolean;
@@ -343,6 +344,17 @@ export const ManageClientsModal: React.FC<ManageClientsModalProps> = ({
                         : 'Conta em dia (R$ 0,00)'}
                     </Text>
                   </View>
+
+                  {item.credit_limit && item.credit_limit > 0 ? (
+                    <View style={styles.limitCircleBox}>
+                      <LimitProgressCircle
+                        currentBalance={item.current_balance}
+                        creditLimit={item.credit_limit}
+                        size={40}
+                        showSubText
+                      />
+                    </View>
+                  ) : null}
                 </TouchableOpacity>
 
                   {/* Ações Rápidas: Histórico & Exclusão Lógica */}
@@ -527,6 +539,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  limitCircleBox: {
+    marginLeft: 4,
+    marginRight: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarBox: {
     width: 44,

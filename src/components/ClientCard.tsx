@@ -7,6 +7,7 @@ import { usePrivacy } from '../theme/PrivacyContext';
 import { formatCurrency } from '../utils/currency';
 import { formatDateBR, getDaysDiffFromToday } from '../utils/date';
 import { getLimitUsageProgress } from '../utils/balanceCalculator';
+import { LimitProgressCircle } from './LimitProgressCircle';
 
 interface ClientCardProps {
   client: Client;
@@ -98,30 +99,26 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </View>
 
         <View style={styles.headerRight}>
-          <Text style={[styles.balanceValue, { color: balanceColor }]}>
-            {maskCurrency(formatCurrency(client.current_balance))}
-          </Text>
-
-          {limitProgress && (
-            <View style={styles.limitGaugeRow}>
-              <View
-                style={[
-                  styles.gaugeDot,
-                  {
-                    backgroundColor:
-                      limitProgress.colorType === 'red'
-                        ? theme.expense
-                        : limitProgress.colorType === 'yellow'
-                        ? theme.warning
-                        : theme.income,
-                  },
-                ]}
-              />
-              <Text style={[styles.limitPercentText, { color: theme.textSecondary }]}>
-                {limitProgress.percent}% do limite
+          <View style={styles.headerRightRow}>
+            <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+              <Text style={[styles.balanceValue, { color: balanceColor }]}>
+                {maskCurrency(formatCurrency(client.current_balance))}
               </Text>
+              {client.credit_limit && client.credit_limit > 0 ? (
+                <Text style={[styles.creditLimitSub, { color: theme.textMuted }]}>
+                  Lim: {maskCurrency(formatCurrency(client.credit_limit))}
+                </Text>
+              ) : null}
             </View>
-          )}
+
+            {client.credit_limit && client.credit_limit > 0 && (
+              <LimitProgressCircle
+                currentBalance={client.current_balance}
+                creditLimit={client.credit_limit}
+                size={44}
+              />
+            )}
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -283,6 +280,16 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     alignItems: 'flex-end',
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  creditLimitSub: {
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '600',
   },
   balanceValue: {
     fontSize: 19,

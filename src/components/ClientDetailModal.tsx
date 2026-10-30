@@ -14,12 +14,13 @@ import { Client, DebitEntry, PaymentRecord } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { formatCurrency } from '../utils/currency';
-import { formatDateBR, formatDateTimeBR } from '../utils/date';
+import { formatDateBR, formatDateTimeBR, getTodayISO, addDaysToISO } from '../utils/date';
 import { getClientDebits } from '../database/entryRepository';
 import { getClientPayments } from '../database/paymentRepository';
 import { generateMessageText, sendWhatsAppMessage } from '../services/whatsappService';
 import { shareClientStatementPdf } from '../services/pdfExportService';
 import { useLicense } from '../theme/LicenseContext';
+import { DatePickerField } from './DatePickerField';
 
 interface ClientDetailModalProps {
   visible: boolean;
@@ -28,6 +29,8 @@ interface ClientDetailModalProps {
   onEditClient: (client: Client) => void;
   onPassarRegua: (client: Client) => void;
 }
+
+type PeriodType = 'all' | '7days' | '30days' | 'this_month' | 'last_month' | 'custom';
 
 export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   visible,
@@ -42,12 +45,17 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
 
   const [debits, setDebits] = useState<DebitEntry[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
-  const [filterPeriod, setFilterPeriod] = useState<'30days' | 'all'>('30days');
+  const [filterPeriod, setFilterPeriod] = useState<PeriodType>('all');
+  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
+  const [customStartDate, setCustomStartDate] = useState<string>(getTodayISO());
+  const [customEndDate, setCustomEndDate] = useState<string>(getTodayISO());
+  const [visibleCount, setVisibleCount] = useState<number>(15);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible && client) {
       loadHistory();
+      setVisibleCount(15);
     }
   }, [visible, client]);
 
@@ -91,6 +99,61 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     await sendWhatsAppMessage(client.whatsapp_primary, text);
   };
 
+  const getFilterBounds = (): { start: string | null; end: string | null; label: string } => {
+    const today = getTodayISO();
+    if (filterPeriod === '7days') {
+      return { start: addDaysToISO(today, -7), end: today, label: 'Últimos 7 dias' };
+    }
+    if (filterPeriod === '30days') {
+      return { start: addDaysToISO(today, -30), end: today, label: 'Últimos 30 dias' };
+    }
+    if (filterPeriod === 'this_month') {
+      const parts = today.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const start = `${parts[0]}-${parts[1]}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const end = `${parts[0]}-${parts[1]}-${String(lastDay).padStart(2, '0')}`;
+      return { start, end, label: 'Este Mês' };
+    }
+    if (filterPeriod === 'last_month') {
+      const parts = today.split('-');
+      let y = parseInt(parts[0], 10);
+      let m = parseInt(parts[1], 10) - 1;
+      if (m === 0) {
+        m = 12;
+        y -= 1;
+      }
+      const mStr = String(m).padStart(2, '0');
+      const start = `${y}-${mStr}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const end = `${y}-${mStr}-${String(lastDay).padStart(2, '0')}`;
+      return { start, end, label: 'Mês Anterior' };
+    }
+    if (filterPeriod === 'custom') {
+      return {
+        start: customStartDate,
+        end: customEndDate,
+        label: `${formatDateBR(customStartDate)} a ${formatDateBR(customEndDate)}`,
+      };
+    }
+    return { start: null, end: null, label: 'Todo o Histórico' };
+  };
+
+  const { start, end, label: currentPeriodLabel } = getFilterBounds();
+
+  const filteredDebits = debits.filter((d) => {
+    if (!start || !end) return true;
+    const date = (d.due_date || d.created_at || '').slice(0, 10);
+    return date >= start && date <= end;
+  });
+
+  const filteredPayments = payments.filter((p) => {
+    if (!start || !end) return true;
+    const date = (p.created_at || '').slice(0, 10);
+    return date >= start && date <= end;
+  });
+
   const handleExportPdf = async () => {
     if (!isPremium) {
       openPaywall({
@@ -102,22 +165,24 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
     }
 
     try {
-      await shareClientStatementPdf(client, debits, payments);
+      await shareClientStatementPdf(client, filteredDebits, filteredPayments, currentPeriodLabel);
     } catch (err: any) {
       Alert.alert('Erro', err.message || 'Falha ao gerar PDF');
     }
   };
 
-  // Montagem da Timeline Unificada
+  // Montagem da Timeline Unificada Filtrada
   const timelineEvents: {
     type: 'debit' | 'payment';
     date: string;
     debit?: DebitEntry;
     payment?: PaymentRecord;
   }[] = [
-    ...debits.map((d) => ({ type: 'debit' as const, date: d.created_at, debit: d })),
-    ...payments.map((p) => ({ type: 'payment' as const, date: p.created_at, payment: p })),
+    ...filteredDebits.map((d) => ({ type: 'debit' as const, date: d.created_at, debit: d })),
+    ...filteredPayments.map((p) => ({ type: 'payment' as const, date: p.created_at, payment: p })),
   ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const pagedEvents = timelineEvents.slice(0, visibleCount);
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -197,17 +262,102 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Linha do Tempo */}
-            <Text style={[styles.sectionTitle, { color: theme.textPrimary }]}>
-              Histórico e Auditoria
-            </Text>
+            {/* Contatos Adicionais e Endereços */}
+            {((client.phones && client.phones.length > 0) || (client.addresses && client.addresses.length > 0) || client.notes) && (
+              <View style={[styles.extraInfoBox, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}>
+                {client.phones && client.phones.length > 0 && (
+                  <View style={{ marginBottom: client.addresses && client.addresses.length > 0 ? 8 : 0 }}>
+                    <Text style={[styles.extraInfoHeading, { color: theme.textSecondary }]}>
+                      Outros Telefones:
+                    </Text>
+                    <View style={styles.chipsWrap}>
+                      {client.phones.map((p, i) => (
+                        <View key={p.id || i} style={[styles.infoChip, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                          <Ionicons name="call-outline" size={12} color={theme.primary} />
+                          <Text style={[styles.infoChipText, { color: theme.textPrimary }]}>
+                            {p.label}: {p.number}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {client.addresses && client.addresses.length > 0 && (
+                  <View style={{ marginTop: client.phones && client.phones.length > 0 ? 8 : 0 }}>
+                    <Text style={[styles.extraInfoHeading, { color: theme.textSecondary }]}>
+                      Endereços:
+                    </Text>
+                    {client.addresses.map((a, i) => (
+                      <View key={a.id || i} style={[styles.addressItem, { borderLeftColor: theme.primary }]}>
+                        <Text style={[styles.addressLabel, { color: theme.primary }]}>
+                          {a.label || 'Principal'}
+                        </Text>
+                        <Text style={[styles.addressText, { color: theme.textPrimary }]}>
+                          {a.street}{a.number ? `, ${a.number}` : ''}{a.neighborhood ? ` - ${a.neighborhood}` : ''}
+                        </Text>
+                        {a.reference ? (
+                          <Text style={[styles.addressRef, { color: theme.textMuted }]}>
+                            Ref: {a.reference}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {client.notes ? (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={[styles.extraInfoHeading, { color: theme.textSecondary }]}>Observações:</Text>
+                    <Text style={[styles.notesText, { color: theme.textPrimary }]}>{client.notes}</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            {/* Cabeçalho do Histórico com Filtro de Período */}
+            <View style={styles.historyHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { color: theme.textPrimary, marginBottom: 2 }]}>
+                  Histórico e Auditoria
+                </Text>
+                <Text style={[styles.periodSubtitle, { color: theme.textSecondary }]}>
+                  {currentPeriodLabel} • {timelineEvents.length} registro(s)
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.filterBtn,
+                  {
+                    backgroundColor: filterPeriod === 'all' ? theme.cardSecondary : theme.primary,
+                    borderColor: theme.border,
+                  },
+                ]}
+                onPress={() => setShowFilterModal(true)}
+              >
+                <Ionicons
+                  name="filter"
+                  size={15}
+                  color={filterPeriod === 'all' ? theme.textPrimary : theme.primaryText}
+                />
+                <Text
+                  style={[
+                    styles.filterBtnText,
+                    { color: filterPeriod === 'all' ? theme.textPrimary : theme.primaryText },
+                  ]}
+                >
+                  Filtro
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {timelineEvents.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                Nenhum lançamento registrado para este cliente.
+                Nenhum lançamento no período selecionado.
               </Text>
             ) : (
-              timelineEvents.map((evt, idx) => {
+              pagedEvents.map((evt, idx) => {
                 if (evt.type === 'debit' && evt.debit) {
                   const d = evt.debit;
                   return (
@@ -305,7 +455,126 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 return null;
               })
             )}
+
+            {/* Paginação: Carregar Mais */}
+            {timelineEvents.length > visibleCount && (
+              <TouchableOpacity
+                style={[styles.loadMoreBtn, { backgroundColor: theme.cardSecondary, borderColor: theme.border }]}
+                onPress={() => setVisibleCount((prev) => prev + 15)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.loadMoreBtnText, { color: theme.primary }]}>
+                  Carregar mais ({timelineEvents.length - visibleCount} restantes)
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={theme.primary} />
+              </TouchableOpacity>
+            )}
           </ScrollView>
+
+          {/* Modal de Filtro de Período */}
+          <Modal
+            visible={showFilterModal}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowFilterModal(false)}
+          >
+            <View style={[styles.filterOverlay, { backgroundColor: theme.backdrop }]}>
+              <View style={[styles.filterSheet, { backgroundColor: theme.card }]}>
+                <View style={[styles.filterSheetHeader, { borderBottomColor: theme.borderLight }]}>
+                  <Text style={[styles.filterSheetTitle, { color: theme.textPrimary }]}>
+                    Filtrar por Período
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowFilterModal(false)} style={styles.closeBtn}>
+                    <Ionicons name="close" size={22} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.filterSheetBody} showsVerticalScrollIndicator={false}>
+                  {(
+                    [
+                      { key: 'all', label: 'Todo o histórico' },
+                      { key: '7days', label: 'Últimos 7 dias' },
+                      { key: '30days', label: 'Últimos 30 dias' },
+                      { key: 'this_month', label: 'Este Mês' },
+                      { key: 'last_month', label: 'Mês Anterior' },
+                      { key: 'custom', label: 'Personalizado' },
+                    ] as const
+                  ).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.filterOptionRow,
+                        {
+                          backgroundColor:
+                            filterPeriod === opt.key ? theme.primary + '15' : 'transparent',
+                          borderColor: filterPeriod === opt.key ? theme.primary : theme.borderLight,
+                        },
+                      ]}
+                      onPress={() => {
+                        setFilterPeriod(opt.key);
+                        setVisibleCount(15);
+                        if (opt.key !== 'custom') {
+                          setShowFilterModal(false);
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name={
+                          filterPeriod === opt.key
+                            ? 'radio-button-on'
+                            : 'radio-button-off'
+                        }
+                        size={20}
+                        color={filterPeriod === opt.key ? theme.primary : theme.textMuted}
+                      />
+                      <Text
+                        style={[
+                          styles.filterOptionLabel,
+                          {
+                            color:
+                              filterPeriod === opt.key ? theme.primary : theme.textPrimary,
+                            fontWeight: filterPeriod === opt.key ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {filterPeriod === 'custom' && (
+                    <View style={styles.customDateRangeBox}>
+                      <DatePickerField
+                        label="Data Inicial"
+                        value={customStartDate}
+                        onChange={(d) => {
+                          setCustomStartDate(d);
+                          setVisibleCount(15);
+                        }}
+                      />
+                      <View style={{ height: 10 }} />
+                      <DatePickerField
+                        label="Data Final"
+                        value={customEndDate}
+                        onChange={(d) => {
+                          setCustomEndDate(d);
+                          setVisibleCount(15);
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={[styles.applyCustomBtn, { backgroundColor: theme.primary }]}
+                        onPress={() => setShowFilterModal(false)}
+                      >
+                        <Text style={[styles.applyCustomBtnText, { color: theme.primaryText }]}>
+                          Aplicar Período
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
 
           {/* Modal de Zoom da Foto */}
           {selectedPhoto && (
@@ -500,5 +769,153 @@ const styles = StyleSheet.create({
   fullImage: {
     width: '95%',
     height: '80%',
+  },
+  extraInfoBox: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  extraInfoHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 5,
+  },
+  infoChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addressItem: {
+    borderLeftWidth: 3,
+    paddingLeft: 8,
+    marginBottom: 6,
+  },
+  addressLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  addressText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  addressRef: {
+    fontSize: 11,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  notesText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  periodSubtitle: {
+    fontSize: 12,
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 5,
+  },
+  filterBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+    marginVertical: 10,
+  },
+  loadMoreBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  filterOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  filterSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 24,
+    maxHeight: '85%',
+  },
+  filterSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  filterSheetTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  filterSheetBody: {
+    padding: 20,
+  },
+  filterOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+    gap: 12,
+  },
+  filterOptionLabel: {
+    fontSize: 14,
+  },
+  customDateRangeBox: {
+    marginTop: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  applyCustomBtn: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  applyCustomBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
