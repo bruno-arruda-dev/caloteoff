@@ -8,7 +8,8 @@ import { getDatabase } from './schema';
 export async function processPayment(
   clientId: string,
   amountPaid: number,
-  notes: string = ''
+  notes: string = '',
+  paymentDateISO?: string
 ): Promise<PaymentRecord> {
   const db = await getDatabase();
   const client = await getClientById(clientId);
@@ -16,7 +17,9 @@ export async function processPayment(
 
   const previousBalance = client.current_balance;
   const settlement = calculateSettlement(previousBalance, amountPaid);
-  const now = new Date().toISOString();
+  const now = paymentDateISO
+    ? `${paymentDateISO}T${new Date().toTimeString().slice(0, 8)}`
+    : new Date().toISOString();
   const paymentId = `pay-${Crypto.randomUUID()}`;
 
   const pendingDebits = await getClientDebits(clientId, 'pending');

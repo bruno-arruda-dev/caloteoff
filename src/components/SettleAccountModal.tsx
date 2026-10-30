@@ -14,8 +14,10 @@ import { Client, PaymentRecord } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
 import { formatCurrency, parseCurrencyInput } from '../utils/currency';
+import { getTodayISO } from '../utils/date';
 import { calculateSettlement } from '../utils/balanceCalculator';
 import { processPayment } from '../database/paymentRepository';
+import { DatePickerField } from './DatePickerField';
 
 interface SettleAccountModalProps {
   visible: boolean;
@@ -34,6 +36,7 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
   const keyboardHeight = useKeyboardBottomInset();
 
   const [amountRaw, setAmountRaw] = useState<string>('');
+  const [paymentDate, setPaymentDate] = useState<string>(getTodayISO());
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -41,6 +44,7 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
     if (visible && client) {
       const debt = Math.max(0, client.current_balance);
       setAmountRaw(debt > 0 ? debt.toFixed(2).replace('.', ',') : '');
+      setPaymentDate(getTodayISO());
       setNotes('');
     }
   }, [visible, client]);
@@ -59,7 +63,7 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
 
     setLoading(true);
     try {
-      const payment = await processPayment(client.id, paidAmount, notes);
+      const payment = await processPayment(client.id, paidAmount, notes, paymentDate);
       onSuccess(payment, client);
       onClose();
     } catch (err: any) {
@@ -193,6 +197,14 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
                 </Text>
               </View>
             </View>
+
+            {/* Data do Pagamento (Padrão Minhas Finanças) */}
+            <DatePickerField
+              value={paymentDate}
+              onChange={setPaymentDate}
+              label="Data do Pagamento"
+              helperText="Data do acerto financeiro"
+            />
 
             {/* Observações Opcionais */}
             <View style={styles.fieldGroup}>

@@ -107,6 +107,54 @@ export function calculateNextBillingDate(
 }
 
 /**
+ * Retorna a quantidade de dias em um determinado ano e mês (1 a 12).
+ */
+export function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * Adiciona ou subtrai meses a uma data respeitando o dia original alvo (targetDay).
+ */
+export function addMonthsPreservingDay(
+  startYear: number,
+  startMonth: number,
+  monthOffset: number,
+  targetDay: number
+): { dateISO: string; year: number; month: number } {
+  let targetMonthIndex = startMonth - 1 + monthOffset;
+  const targetYear = startYear + Math.floor(targetMonthIndex / 12);
+  const normalizedMonth = (((targetMonthIndex % 12) + 12) % 12) + 1;
+
+  const maxDays = getDaysInMonth(targetYear, normalizedMonth);
+  const clampedDay = Math.min(targetDay, maxDays);
+
+  const monthStr = String(normalizedMonth).padStart(2, '0');
+  const dayStr = String(clampedDay).padStart(2, '0');
+
+  return {
+    dateISO: `${targetYear}-${monthStr}-${dayStr}`,
+    year: targetYear,
+    month: normalizedMonth,
+  };
+}
+
+/**
+ * Adiciona ou subtrai dias de uma data ISO ('YYYY-MM-DD').
+ */
+export function addDaysToISO(isoDate: string, days: number): string {
+  if (!isoDate) return getTodayISO();
+  const parts = isoDate.split('-').map(Number);
+  if (parts.length !== 3) return getTodayISO();
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  date.setDate(date.getDate() + days);
+  const ny = date.getFullYear();
+  const nm = String(date.getMonth() + 1).padStart(2, '0');
+  const nd = String(date.getDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
+}
+
+/**
  * Retorna a diferença de dias entre uma data e hoje (positivo = atrasado, negativo = a vencer, 0 = hoje)
  */
 export function getDaysDiffFromToday(targetIsoDate: string): number {

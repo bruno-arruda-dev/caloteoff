@@ -19,6 +19,7 @@ import { formatCurrency, parseCurrencyInput } from '../utils/currency';
 import { formatDateBR, getTodayISO } from '../utils/date';
 import { checkCreditLimit } from '../utils/balanceCalculator';
 import { addDebitEntry } from '../database/entryRepository';
+import { DatePickerField } from './DatePickerField';
 
 interface NewDebitModalProps {
   visible: boolean;
@@ -324,24 +325,13 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
               />
             </View>
 
-            {/* Data de Vencimento / Fechamento */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Data do Fiado</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.cardSecondary,
-                    borderColor: theme.border,
-                    color: theme.textPrimary,
-                  },
-                ]}
-                value={dueDate}
-                onChangeText={setDueDate}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor={theme.textMuted}
-              />
-            </View>
+            {/* Data de Vencimento / Fechamento com DatePickerField (Padrão Minhas Finanças) */}
+            <DatePickerField
+              value={dueDate}
+              onChange={setDueDate}
+              label="Data do Fiado"
+              helperText="Data do lançamento da dívida"
+            />
 
             {/* Botão Acordeão "Mostrar Mais" */}
             <TouchableOpacity
