@@ -152,23 +152,6 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
 
             <TouchableOpacity
               style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
-              onPress={() => handleAction(onOpenClients)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.iconBox, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="people-outline" size={20} color="#0284C7" />
-              </View>
-              <View style={styles.itemTextContainer}>
-                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Clientes</Text>
-                <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
-                  Cadastro, histórico e gestão da carteira
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
               onPress={() => handleAction(onOpenBusinessProfile)}
               activeOpacity={0.7}
             >
@@ -179,6 +162,23 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Meu Negócio</Text>
                 <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
                   Nome fantasia, logotipo e cor da marca
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+              onPress={() => handleAction(onOpenClients)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconBox, { backgroundColor: '#E0F2FE' }]}>
+                <Ionicons name="people-outline" size={20} color="#0284C7" />
+              </View>
+              <View style={styles.itemTextContainer}>
+                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Clientes</Text>
+                <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
+                  Cadastro, histórico e gestão da carteira
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />

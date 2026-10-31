@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getBusinessProfile, getPixKeys } from '../database/businessRepository';
 import { Client, DebitEntry, PaymentRecord } from '../types';
 import { formatCurrency } from '../utils/currency';
@@ -20,6 +21,33 @@ export async function generateClientStatementPdf(
   const storePhone = profile.phone ? `WhatsApp: ${profile.phone}` : '';
   const clientName = client.name || client.nickname;
   const clientNickname = client.nickname && client.nickname !== client.name ? `(${client.nickname})` : '';
+
+  // Conversão de logotipo para base64 para renderização confiável no HTML do PDF
+  let logoBase64Src = '';
+  if (profile.logo_uri) {
+    try {
+      if (profile.logo_uri.startsWith('data:image')) {
+        logoBase64Src = profile.logo_uri;
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(profile.logo_uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        if (base64) {
+          logoBase64Src = `data:image/png;base64,${base64}`;
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar logomarca para o PDF:', err);
+    }
+  }
+
+  const logoHtml = logoBase64Src
+    ? `
+      <div style="width: 58px; height: 58px; min-width: 58px; border-radius: 12px; overflow: hidden; margin-right: 14px; border: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: center; background-color: #FFFFFF;">
+        <img src="${logoBase64Src}" style="width: 100%; height: 100%; object-fit: contain;" />
+      </div>
+    `
+    : '';
 
   const pendingDebits = entries.filter((e) => e.status === 'pending');
   const paidDebits = entries.filter((e) => e.status === 'paid');
@@ -100,9 +128,12 @@ export async function generateClientStatementPdf(
       </head>
       <body>
         <div class="header">
-          <div>
-            <h1 class="title">${storeName}</h1>
-            <p class="subtitle">${storePhone}</p>
+          <div style="display: flex; align-items: center;">
+            ${logoHtml}
+            <div>
+              <h1 class="title">${storeName}</h1>
+              ${storePhone ? `<p class="subtitle">${storePhone}</p>` : ''}
+            </div>
           </div>
           <div style="text-align: right;">
             <p style="margin: 0; font-size: 12px; font-weight: 700; color: #64748B;">EXTRATO DE CONTA</p>
@@ -175,8 +206,34 @@ export async function generateClientStatementPdf(
     </html>
   `;
 
-  const { uri } = await Print.printToFileAsync({ html });
-  return uri;
+  const { uri: generatedUri } = await Print.printToFileAsync({ html });
+
+  // Nome do arquivo amigável para o cliente (ex: Extrato_Susanna_2026-10-30.pdf)
+  const sanitizeName = (str: string) =>
+    str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_');
+
+  const safeClientName = sanitizeName(client.nickname || client.name || 'Cliente');
+  const dateSuffix = new Date().toISOString().slice(0, 10);
+  const friendlyFileName = `Extrato_${safeClientName}_${dateSuffix}.pdf`;
+
+  if (FileSystem.cacheDirectory) {
+    const targetUri = `${FileSystem.cacheDirectory}${friendlyFileName}`;
+    try {
+      await FileSystem.copyAsync({
+        from: generatedUri,
+        to: targetUri,
+      });
+      return targetUri;
+    } catch (err) {
+      console.warn('Erro ao renomear arquivo PDF:', err);
+    }
+  }
+
+  return generatedUri;
 }
 
 export async function shareClientStatementPdf(
