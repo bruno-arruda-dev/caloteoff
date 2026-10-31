@@ -16,10 +16,11 @@ import { useLicense } from '../theme/LicenseContext';
 import { isBiometricsAvailable, authenticateWithBiometrics } from '../services/authService';
 import { getSetting, setSetting } from '../database/settingsRepository';
 import { exportBackup, pickAndRestoreBackup } from '../services/backupService';
+import { BackupType } from '../services/backup/backupTypes';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../services/notificationService';
 import { LimitPolicy } from '../types';
 
-const APP_VERSION_STRING = 'v1.0.2 (Build 3)';
+const APP_VERSION_STRING = 'v1.0.3 (Build 4)';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -135,48 +136,86 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleExportBackup = async () => {
+  const executeExport = async (type: BackupType) => {
+    const res = await exportBackup({ backupType: type });
+    if (res.success) {
+      const typeLabel =
+        type === 'PENDING_ONLY'
+          ? 'de Pendências'
+          : type === 'CONSOLIDATED_ARCHIVE'
+          ? 'Consolidado (Arquivo Morto)'
+          : 'Completo';
+      Alert.alert(
+        'Sucesso 🎉',
+        `Backup ${typeLabel} exportado e salvo com segurança!\n\n${
+          res.header
+            ? `• Clientes: ${res.header.summary.total_clients}\n• Registros: ${res.header.summary.total_entries}\n• Total: R$ ${res.header.summary.total_pending_amount.toFixed(2)}`
+            : ''
+        }`
+      );
+    } else {
+      Alert.alert('Erro', res.error || 'Falha ao exportar backup');
+    }
+  };
+
+  const handleExportBackup = () => {
     Alert.alert(
-      'Exportar Backup',
-      'Deseja exportar uma cópia completa dos seus clientes, compras fiadas e chaves Pix?',
+      'Exportar Backup do Irineu',
+      'Escolha qual modalidade de backup deseja gerar:',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Exportar Agora',
-          onPress: async () => {
-            const res = await exportBackup();
-            if (res.success) {
-              Alert.alert('Sucesso', 'Arquivo de backup exportado com segurança!');
-            } else {
-              Alert.alert('Erro', res.error || 'Falha ao exportar backup');
-            }
-          },
+          text: '⚡ Apenas Pendências',
+          onPress: () => executeExport('PENDING_ONLY'),
+        },
+        {
+          text: '📦 Histórico Consolidado',
+          onPress: () => executeExport('CONSOLIDATED_ARCHIVE'),
+        },
+        {
+          text: '🛡️ Backup Completo',
+          onPress: () => executeExport('FULL'),
         },
       ]
     );
   };
 
-  const handleRestoreBackup = async () => {
+  const handleRestoreBackup = () => {
     Alert.alert(
-      'Restaurar Backup',
-      'Ao restaurar um backup, os dados do arquivo substituirão os registros atuais. Deseja prosseguir?',
+      'Restaurar Backup do Irineu',
+      'Escolha como deseja aplicar o arquivo de backup no seu aplicativo:\n\n• Substituição Total: Remove os dados locais e restaura exatamente o arquivo.\n• Mesclar/Acrescentar: Mantém seus dados atuais e adiciona apenas novos clientes e compras do backup.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Selecionar Arquivo',
-          onPress: async () => {
-            const res = await pickAndRestoreBackup();
-            if (res.success) {
-              Alert.alert('Sucesso 🎉', 'Dados restaurados com sucesso!');
-              if (onDataRestored) onDataRestored();
-              onClose();
-            } else if (res.error && res.error !== 'Seleção cancelada') {
-              Alert.alert('Atenção', res.error);
-            }
-          },
+          text: '🔄 Mesclar com Atuais',
+          onPress: () => executeRestore('MERGE'),
+        },
+        {
+          text: '⚠️ Substituir Tudo',
+          style: 'destructive',
+          onPress: () => executeRestore('REPLACE_ALL'),
         },
       ]
     );
+  };
+
+  const executeRestore = async (mode: 'REPLACE_ALL' | 'MERGE') => {
+    const res = await pickAndRestoreBackup(undefined, undefined, mode);
+    if (res.success) {
+      const summary = res.header?.summary;
+      Alert.alert(
+        'Restauração Concluída! 🎉',
+        `Dados processados com sucesso via migração automática!\n\n${
+          summary
+            ? `• Clientes restaurados: ${summary.total_clients}\n• Registros: ${summary.total_entries}\n• Pendente: R$ ${summary.total_pending_amount.toFixed(2)}`
+            : ''
+        }`
+      );
+      if (onDataRestored) onDataRestored();
+      onClose();
+    } else if (res.error && res.error !== 'Seleção cancelada') {
+      Alert.alert('Atenção', res.error);
+    }
   };
 
   return (
@@ -465,10 +504,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </View>
               <View style={styles.itemTextCol}>
                 <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
-                  Exportar Backup (.caloteoff)
+                  Exportar Backup (.irineu)
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Salva cópia criptografada dos seus clientes e fiados
+                  Completo, Apenas Pendências ou Arquivo Morto
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
@@ -490,7 +529,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Restaurar Backup
                 </Text>
                 <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
-                  Importa clientes e histórico de arquivo protegido
+                  Substituir tudo ou mesclar com histórico existente
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />

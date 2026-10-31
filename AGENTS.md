@@ -20,6 +20,10 @@ This is an Expo/React Native mobile application for controlling credit sales ("v
 3. **Limite de Fiado e Políticas de Estouro:**
    - `AVISAR_E_PERMITIR`: Alerta o lojista sobre o risco, mas permite salvar se confirmado.
    - `BLOQUEAR_TOTAL`: Impede o salvamento enquanto o valor exceder o teto estipulado.
+4. **Doutrina Sagrada de Backup & Migrations:**
+   - Documento canônico: [`docs/doctrine/DOUTRINA_BACKUP_MIGRATIONS.md`](docs/doctrine/DOUTRINA_BACKUP_MIGRATIONS.md).
+   - Backups antigos NUNCA podem ser rejeitados ou quebrar. Toda alteração de schema exige migração sequencial pura (`V_antiga -> V_nova`) com retrocompatibilidade garantida e testes unitários dedicados.
+   - Suporte modular obrigatório: Backup Completo (`FULL`), Apenas Pendências (`PENDING_ONLY`) e Arquivo Morto/Consolidado (`CONSOLIDATED_ARCHIVE`).
 
 ## 3. Definition of Done (DoD) & Release Workflow
 
