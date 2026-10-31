@@ -102,9 +102,15 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           <View style={styles.headerRightRow}>
             <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
               <Text style={[styles.balanceValue, { color: balanceColor }]}>
-                {maskCurrency(formatCurrency(client.current_balance))}
+                {isCreditor
+                  ? `+${maskCurrency(formatCurrency(Math.abs(client.current_balance)))}`
+                  : maskCurrency(formatCurrency(client.current_balance))}
               </Text>
-              {client.credit_limit && client.credit_limit > 0 ? (
+              {isCreditor ? (
+                <Text style={[styles.creditLimitSub, { color: theme.income, fontWeight: '700' }]}>
+                  Crédito a favor
+                </Text>
+              ) : client.credit_limit && client.credit_limit > 0 ? (
                 <Text style={[styles.creditLimitSub, { color: theme.textMuted }]}>
                   Lim: {maskCurrency(formatCurrency(client.credit_limit))}
                 </Text>

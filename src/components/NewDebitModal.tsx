@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { Client, DebitEntry } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
@@ -47,6 +48,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   const [dueDate, setDueDate] = useState<string>(getTodayISO());
   const [description, setDescription] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const [showMore, setShowMore] = useState<boolean>(false);
   const [clientSearch, setClientSearch] = useState<string>('');
   const [isSelectingClient, setIsSelectingClient] = useState<boolean>(false);
@@ -65,12 +67,13 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
       setDueDate(getTodayISO());
       setDescription('');
       setPhotoUri(null);
+      setAttachmentName(null);
       setShowMore(false);
       setIsSelectingClient(false);
     }
   }, [visible, initialClient, clients]);
 
-  const handlePickPhoto = async () => {
+  const handlePickFromCamera = async () => {
     try {
       const res = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
@@ -80,17 +83,67 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
 
       if (!res.canceled && res.assets && res.assets.length > 0) {
         setPhotoUri(res.assets[0].uri);
+        setAttachmentName(res.assets[0].fileName || 'Foto_Canhoto.jpg');
       }
-    } catch {
-      // Se a câmera não abrir ou usuário preferir galeria
-      const resGaleria = await ImagePicker.launchImageLibraryAsync({
+    } catch (err) {
+      console.warn('Erro ao abrir câmera:', err);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.8,
+        allowsEditing: true,
       });
-      if (!resGaleria.canceled && resGaleria.assets && resGaleria.assets.length > 0) {
-        setPhotoUri(resGaleria.assets[0].uri);
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        setPhotoUri(res.assets[0].uri);
+        setAttachmentName(res.assets[0].fileName || 'Imagem_Galeria.jpg');
       }
+    } catch (err) {
+      console.warn('Erro ao abrir galeria:', err);
     }
+  };
+
+  const handlePickFromStorage = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['*/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const file = res.assets[0];
+        setPhotoUri(file.uri);
+        setAttachmentName(file.name || 'Comprovante_Anexo');
+      }
+    } catch (err) {
+      console.warn('Erro ao abrir arquivos do aparelho:', err);
+    }
+  };
+
+  const handleOpenAttachOptions = () => {
+    Alert.alert(
+      'Anexar Comprovante / Arquivo',
+      'De onde você deseja selecionar o arquivo?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: '📷 Tirar Foto (Câmera)',
+          onPress: handlePickFromCamera,
+        },
+        {
+          text: '🖼️ Escolher da Galeria',
+          onPress: handlePickFromGallery,
+        },
+        {
+          text: '📁 Memória do Aparelho (PDF/Arquivo)',
+          onPress: handlePickFromStorage,
+        },
+      ]
+    );
   };
 
   const handleSave = async () => {
@@ -383,14 +436,31 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
 
                 <View style={styles.fieldGroup}>
                   <Text style={[styles.label, { color: theme.textSecondary }]}>
-                    Foto do Canhoto / Comprovante
+                    Anexo do Canhoto / Comprovante
                   </Text>
                   {photoUri ? (
-                    <View style={styles.photoPreviewContainer}>
-                      <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+                    <View style={[styles.photoPreviewContainer, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}>
+                      {photoUri.toLowerCase().endsWith('.pdf') || attachmentName?.toLowerCase().endsWith('.pdf') ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, padding: 12 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <Ionicons name="document-text" size={24} color="#DC2626" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }} numberOfLines={1}>
+                              {attachmentName || 'Comprovante em PDF'}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: theme.textMuted }}>Arquivo da memória do aparelho</Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+                      )}
                       <TouchableOpacity
                         style={styles.removePhotoBtn}
-                        onPress={() => setPhotoUri(null)}
+                        onPress={() => {
+                          setPhotoUri(null);
+                          setAttachmentName(null);
+                        }}
                       >
                         <Ionicons name="trash" size={16} color="#FFFFFF" />
                       </TouchableOpacity>
@@ -401,11 +471,17 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
                         styles.photoPickerBtn,
                         { backgroundColor: theme.cardSecondary, borderColor: theme.border },
                       ]}
-                      onPress={handlePickPhoto}
+                      onPress={handleOpenAttachOptions}
+                      activeOpacity={0.7}
                     >
-                      <Ionicons name="camera" size={20} color={theme.primary} />
-                      <Text style={[styles.photoPickerText, { color: theme.primary }]}>
-                        Fotografar Canhoto / Assinatura
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Ionicons name="attach" size={22} color={theme.primary} />
+                        <Text style={[styles.photoPickerText, { color: theme.primary }]}>
+                          Anexar Canhoto, Foto ou Arquivo
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 4 }}>
+                        Câmera, Galeria de Fotos ou Memória do Aparelho (PDF/Docs)
                       </Text>
                     </TouchableOpacity>
                   )}

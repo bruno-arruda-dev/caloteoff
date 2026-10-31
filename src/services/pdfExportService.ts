@@ -183,19 +183,74 @@ export async function generateClientStatementPdf(
             : ''
         }
 
-        <div class="balance-card">
-          <div>
-            <p style="margin: 0; font-size: 13px; color: #94A3B8; text-transform: uppercase; font-weight: 600;">Saldo Atual do Cliente</p>
-            <p style="margin: 4px 0 0 0; font-size: 11px; color: #CBD5E1;">
-              ${client.current_balance > 0 ? 'Total pendente para acerto' : client.current_balance < 0 ? 'Crédito a favor do cliente' : 'Conta totalmente quitada'}
-            </p>
+        <!-- Banner de Saldo com tratamento claro para Saldo a Favor -->
+        ${
+          client.current_balance < -0.001
+            ? `
+          <div style="margin-top: 24px; background: #064E3B; border: 2px solid #059669; color: #FFFFFF; border-radius: 14px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; background-color: #10B981; color: #064E3B; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ✓ Crédito a Favor do Cliente
+                </span>
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 12px; color: #A7F3D0; font-weight: 500;">
+                O cliente adiantou pagamento e possui saldo positivo para abater em compras futuras.
+              </p>
+            </div>
+            <div style="text-align: right; min-width: 160px;">
+              <span style="font-size: 11px; font-weight: 700; color: #6EE7B7; text-transform: uppercase; display: block; margin-bottom: 2px;">
+                Saldo Disponível
+              </span>
+              <span style="font-size: 28px; font-weight: 900; color: #34D399; letter-spacing: -0.5px;">
+                +${formatCurrency(Math.abs(client.current_balance))}
+              </span>
+            </div>
           </div>
-          <div>
-            <span style="font-size: 26px; font-weight: 900; color: ${client.current_balance > 0 ? '#F87171' : client.current_balance < 0 ? '#60A5FA' : '#4ADE80'};">
-              ${formatCurrency(client.current_balance)}
-            </span>
+        `
+            : client.current_balance > 0.001
+            ? `
+          <div style="margin-top: 24px; background: #0F172A; border-radius: 14px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; background-color: #DC2626; color: #FFFFFF; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Total Pendente para Acerto
+                </span>
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 12px; color: #CBD5E1;">
+                Valor acumulado em aberto para quitação.
+              </p>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; display: block; margin-bottom: 2px;">
+                A Pagar
+              </span>
+              <span style="font-size: 28px; font-weight: 900; color: #F87171; letter-spacing: -0.5px;">
+                ${formatCurrency(client.current_balance)}
+              </span>
+            </div>
           </div>
-        </div>
+        `
+            : `
+          <div style="margin-top: 24px; background: #0F172A; border-radius: 14px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; background-color: #16A34A; color: #FFFFFF; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px;">
+                  ✓ Conta Totalmente em Dia
+                </span>
+              </div>
+              <p style="margin: 8px 0 0 0; font-size: 12px; color: #CBD5E1;">
+                Nenhum débito ou pendência no momento.
+              </p>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 28px; font-weight: 900; color: #4ADE80; letter-spacing: -0.5px;">
+                R$ 0,00
+              </span>
+            </div>
+          </div>
+        `
+        }
 
         ${pixSectionHtml}
 

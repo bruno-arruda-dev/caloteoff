@@ -20,13 +20,14 @@ import { BackupType } from '../services/backup/backupTypes';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../services/notificationService';
 import { LimitPolicy } from '../types';
 
-const APP_VERSION_STRING = 'v1.0.3 (Build 4)';
+const APP_VERSION_STRING = 'v1.0.4 (Build 5)';
 
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
   onOpenThemes?: () => void;
   onOpenTemplates?: () => void;
+  onOpenNotifications?: () => void;
   onOpenBusinessProfile?: () => void;
   onOpenPixKeys?: () => void;
   onDataRestored?: () => void;
@@ -37,6 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onOpenThemes,
   onOpenTemplates,
+  onOpenNotifications,
   onOpenBusinessProfile,
   onOpenPixKeys,
   onDataRestored,
@@ -53,6 +55,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [biometricsEnabled, setBiometricsEnabled] = useState<boolean>(false);
   const [hasBiometricHardware, setHasBiometricHardware] = useState<boolean>(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [exportModalVisible, setExportModalVisible] = useState<boolean>(false);
+  const [restoreModalVisible, setRestoreModalVisible] = useState<boolean>(false);
   const [globalLimitPolicy, setGlobalLimitPolicy] = useState<LimitPolicy>('AVISAR_E_PERMITIR');
   const devTapCountRef = useRef<number>(0);
 
@@ -159,44 +163,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleExportBackup = () => {
-    Alert.alert(
-      'Exportar Backup do Irineu',
-      'Escolha qual modalidade de backup deseja gerar:',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: '⚡ Apenas Pendências',
-          onPress: () => executeExport('PENDING_ONLY'),
-        },
-        {
-          text: '📦 Histórico Consolidado',
-          onPress: () => executeExport('CONSOLIDATED_ARCHIVE'),
-        },
-        {
-          text: '🛡️ Backup Completo',
-          onPress: () => executeExport('FULL'),
-        },
-      ]
-    );
+    setExportModalVisible(true);
   };
 
   const handleRestoreBackup = () => {
-    Alert.alert(
-      'Restaurar Backup do Irineu',
-      'Escolha como deseja aplicar o arquivo de backup no seu aplicativo:\n\n• Substituição Total: Remove os dados locais e restaura exatamente o arquivo.\n• Mesclar/Acrescentar: Mantém seus dados atuais e adiciona apenas novos clientes e compras do backup.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: '🔄 Mesclar com Atuais',
-          onPress: () => executeRestore('MERGE'),
-        },
-        {
-          text: '⚠️ Substituir Tudo',
-          style: 'destructive',
-          onPress: () => executeRestore('REPLACE_ALL'),
-        },
-      ]
-    );
+    setRestoreModalVisible(true);
   };
 
   const executeRestore = async (mode: 'REPLACE_ALL' | 'MERGE') => {
@@ -487,6 +458,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
             </View>
 
+            {onOpenNotifications && (
+              <TouchableOpacity
+                style={[
+                  styles.itemRow,
+                  { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight, marginTop: 8 },
+                ]}
+                onPress={() => {
+                  onClose();
+                  setTimeout(() => onOpenNotifications(), 150);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.itemIcon, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="time-outline" size={20} color="#D97706" />
+                </View>
+                <View style={styles.itemTextCol}>
+                  <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>
+                    Regras de Notificação & Horários
+                  </Text>
+                  <Text style={[styles.itemSub, { color: theme.textSecondary }]}>
+                    Cobrar no dia recomendado, dias após 1ª compra e atrasos
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
+
             {/* BACKUP */}
             <Text style={[styles.sectionHeader, { color: theme.textSecondary }]}>
               DADOS & BACKUP
@@ -636,6 +634,189 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </ScrollView>
         </View>
       </View>
+
+      {/* MODAL VISUAL: SELEÇÃO CLARA DE EXPORTAÇÃO DE BACKUP */}
+      <Modal visible={exportModalVisible} transparent animationType="fade" onRequestClose={() => setExportModalVisible(false)}>
+        <View style={styles.subModalOverlay}>
+          <View style={[styles.subModalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.subModalHeader}>
+              <View>
+                <Text style={[styles.subModalTitle, { color: theme.textPrimary }]}>Exportar Backup do Irineu</Text>
+                <Text style={[styles.subModalSubtitle, { color: theme.textMuted }]}>Escolha a modalidade de dados que deseja salvar:</Text>
+              </View>
+              <TouchableOpacity onPress={() => setExportModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
+              {/* Opção 1: Backup Completo */}
+              <TouchableOpacity
+                style={[styles.backupCardOption, { backgroundColor: theme.primaryBg, borderColor: theme.primary }]}
+                onPress={() => {
+                  setExportModalVisible(false);
+                  executeExport('FULL');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backupCardTop}>
+                  <View style={[styles.backupIconBox, { backgroundColor: theme.primary }]}>
+                    <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.backupCardTitle, { color: theme.textPrimary }]}>1. Backup Completo</Text>
+                      <View style={{ backgroundColor: theme.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFFFFF' }}>RECOMENDADO</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.backupCardSub, { color: theme.textSecondary }]}>Salva todos os dados sem exceção</Text>
+                  </View>
+                </View>
+                <View style={styles.backupCardDetails}>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary }]}>• <Text style={{ fontWeight: '700' }}>O que inclui:</Text> Todos os clientes, contatos, compras em aberto, fiados pagos e histórico de amortizações.</Text>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary, marginTop: 4 }]}>• <Text style={{ fontWeight: '700' }}>Quando usar:</Text> Para trocar de aparelho ou manter uma cópia de segurança total e periódica.</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Opção 2: Apenas Pendências */}
+              <TouchableOpacity
+                style={[styles.backupCardOption, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+                onPress={() => {
+                  setExportModalVisible(false);
+                  executeExport('PENDING_ONLY');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backupCardTop}>
+                  <View style={[styles.backupIconBox, { backgroundColor: '#D97706' }]}>
+                    <Ionicons name="flash" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.backupCardTitle, { color: theme.textPrimary }]}>2. Apenas Pendências</Text>
+                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#B45309' }}>COBRANÇA ATIVA</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.backupCardSub, { color: theme.textSecondary }]}>Focado no que tem para receber hoje</Text>
+                  </View>
+                </View>
+                <View style={styles.backupCardDetails}>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary }]}>• <Text style={{ fontWeight: '700' }}>O que inclui:</Text> Somente os clientes que estão devendo e compras não pagas.</Text>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary, marginTop: 4 }]}>• <Text style={{ fontWeight: '700' }}>Quando usar:</Text> Backup rápido do dia a dia focado em cobrança, sem histórico passado.</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Opção 3: Histórico Consolidado */}
+              <TouchableOpacity
+                style={[styles.backupCardOption, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+                onPress={() => {
+                  setExportModalVisible(false);
+                  executeExport('CONSOLIDATED_ARCHIVE');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backupCardTop}>
+                  <View style={[styles.backupIconBox, { backgroundColor: '#475569' }]}>
+                    <Ionicons name="archive" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.backupCardTitle, { color: theme.textPrimary }]}>3. Histórico Consolidado</Text>
+                      <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#475569' }}>ARQUIVO MORTO</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.backupCardSub, { color: theme.textSecondary }]}>Guarda quitações e contas já pagas</Text>
+                  </View>
+                </View>
+                <View style={styles.backupCardDetails}>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary }]}>• <Text style={{ fontWeight: '700' }}>O que inclui:</Text> Somente compras quitadas e pagamentos recebidos no passado.</Text>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary, marginTop: 4 }]}>• <Text style={{ fontWeight: '700' }}>Quando usar:</Text> Para fins de conferência contábil e desafogar o dia a dia.</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL VISUAL: SELEÇÃO CLARA DE RESTAURAÇÃO DE BACKUP */}
+      <Modal visible={restoreModalVisible} transparent animationType="fade" onRequestClose={() => setRestoreModalVisible(false)}>
+        <View style={styles.subModalOverlay}>
+          <View style={[styles.subModalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.subModalHeader}>
+              <View>
+                <Text style={[styles.subModalTitle, { color: theme.textPrimary }]}>Restaurar Backup do Irineu</Text>
+                <Text style={[styles.subModalSubtitle, { color: theme.textMuted }]}>Escolha como deseja aplicar o arquivo no aparelho:</Text>
+              </View>
+              <TouchableOpacity onPress={() => setRestoreModalVisible(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12, marginTop: 12 }}>
+              {/* Opção 1: Mesclar com Dados Atuais */}
+              <TouchableOpacity
+                style={[styles.backupCardOption, { backgroundColor: theme.primaryBg, borderColor: theme.primary }]}
+                onPress={() => {
+                  setRestoreModalVisible(false);
+                  executeRestore('MERGE');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backupCardTop}>
+                  <View style={[styles.backupIconBox, { backgroundColor: theme.primary }]}>
+                    <Ionicons name="git-merge-outline" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.backupCardTitle, { color: theme.textPrimary }]}>Mesclar com Dados Atuais</Text>
+                      <View style={{ backgroundColor: theme.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFFFFF' }}>MANTÉM O ATUAL</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.backupCardSub, { color: theme.textSecondary }]}>Não apaga nada do que você já tem hoje</Text>
+                  </View>
+                </View>
+                <View style={styles.backupCardDetails}>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary }]}>• Mantém todos os seus clientes e fiados atuais intactos.</Text>
+                  <Text style={[styles.backupDetailItem, { color: theme.textSecondary, marginTop: 4 }]}>• Adiciona apenas clientes novos e lançamentos que não existirem no seu aparelho.</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Opção 2: Substituição Total */}
+              <TouchableOpacity
+                style={[styles.backupCardOption, { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }]}
+                onPress={() => {
+                  setRestoreModalVisible(false);
+                  executeRestore('REPLACE_ALL');
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backupCardTop}>
+                  <View style={[styles.backupIconBox, { backgroundColor: '#DC2626' }]}>
+                    <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.backupCardTitle, { color: '#991B1B' }]}>Substituição Total</Text>
+                      <View style={{ backgroundColor: '#DC2626', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFFFFF' }}>LIMPAR & RESTAURAR</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.backupCardSub, { color: '#B91C1C' }]}>Deixa o aparelho exatamente igual ao arquivo</Text>
+                  </View>
+                </View>
+                <View style={styles.backupCardDetails}>
+                  <Text style={[styles.backupDetailItem, { color: '#991B1B' }]}>• Substitui a base local inteira pelos dados do backup selecionado.</Text>
+                  <Text style={[styles.backupDetailItem, { color: '#991B1B', marginTop: 4 }]}>• Ideal ao comprar celular novo ou recuperar cópia geral.</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -817,5 +998,68 @@ const styles = StyleSheet.create({
   aboutText: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  subModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  subModalContent: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  subModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  subModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  subModalSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  backupCardOption: {
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 12,
+  },
+  backupCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backupIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backupCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  backupCardSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  backupCardDetails: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  backupDetailItem: {
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

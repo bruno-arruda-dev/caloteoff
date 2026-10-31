@@ -24,6 +24,7 @@ interface SidebarDrawerProps {
   onOpenBusinessProfile: () => void;
   onOpenPixKeys: () => void;
   onOpenTemplates: () => void;
+  onOpenNotifications?: () => void;
   onOpenBackup: () => void;
   onOpenThemes: () => void;
   onOpenSettings: () => void;
@@ -40,6 +41,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onOpenBusinessProfile,
   onOpenPixKeys,
   onOpenTemplates,
+  onOpenNotifications,
   onOpenBackup,
   onOpenThemes,
   onOpenSettings,
@@ -217,6 +219,25 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
               </View>
               <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </TouchableOpacity>
+
+            {onOpenNotifications && (
+              <TouchableOpacity
+                style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}
+                onPress={() => handleAction(onOpenNotifications)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
+                  <Ionicons name="notifications-outline" size={20} color="#D97706" />
+                </View>
+                <View style={styles.itemTextContainer}>
+                  <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Lembretes & Notificações</Text>
+                  <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
+                    Regras de cobrança automática e horários
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+              </TouchableOpacity>
+            )}
 
             {/* Seção 2: SEGURANÇA & DADOS */}
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>DADOS & SEGURANÇA</Text>

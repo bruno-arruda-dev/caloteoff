@@ -100,7 +100,11 @@ export interface MessageTemplate {
   updated_at: string;
 }
 
-export type NotificationRuleType = 'before_due' | 'on_due_date' | 'after_due';
+export type NotificationRuleType =
+  | 'before_due'
+  | 'on_due_date'
+  | 'after_due'
+  | 'after_first_purchase';
 
 export interface NotificationRule {
   id: string;

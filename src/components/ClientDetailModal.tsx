@@ -19,6 +19,7 @@ import { getClientDebits } from '../database/entryRepository';
 import { getClientPayments } from '../database/paymentRepository';
 import { generateMessageText, sendWhatsAppMessage } from '../services/whatsappService';
 import { shareClientStatementPdf } from '../services/pdfExportService';
+import * as Sharing from 'expo-sharing';
 import { useLicense } from '../theme/LicenseContext';
 import { DatePickerField } from './DatePickerField';
 
@@ -221,13 +222,22 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                     color: isDebtor
                       ? theme.expense
                       : isCreditor
-                      ? theme.accent
+                      ? theme.income
                       : theme.income,
                   },
                 ]}
               >
-                {maskCurrency(formatCurrency(client.current_balance))}
+                {isCreditor
+                  ? `+${maskCurrency(formatCurrency(Math.abs(client.current_balance)))}`
+                  : maskCurrency(formatCurrency(client.current_balance))}
               </Text>
+              {isCreditor && (
+                <View style={{ backgroundColor: theme.incomeBg, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, alignSelf: 'center', marginTop: 4 }}>
+                  <Text style={{ color: theme.income, fontSize: 11, fontWeight: '700' }}>
+                    ✓ Crédito a favor do cliente
+                  </Text>
+                </View>
+              )}
               <Text style={[styles.clientZap, { color: theme.textMuted }]}>
                 WhatsApp: {client.whatsapp_primary}
               </Text>
@@ -381,11 +391,29 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                         </Text>
                         {d.receipt_image_uri && (
                           <TouchableOpacity
-                            onPress={() => setSelectedPhoto(d.receipt_image_uri)}
+                            onPress={async () => {
+                              if (d.receipt_image_uri?.toLowerCase().endsWith('.pdf')) {
+                                try {
+                                  await Sharing.shareAsync(d.receipt_image_uri);
+                                } catch {
+                                  Alert.alert('Arquivo', 'Não foi possível abrir o documento PDF.');
+                                }
+                              } else {
+                                setSelectedPhoto(d.receipt_image_uri);
+                              }
+                            }}
                             style={styles.thumbWrapper}
                           >
-                            <Image source={{ uri: d.receipt_image_uri }} style={styles.thumbnail} />
-                            <Text style={[styles.thumbText, { color: theme.primary }]}>Ver Canhoto</Text>
+                            {d.receipt_image_uri?.toLowerCase().endsWith('.pdf') ? (
+                              <View style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
+                                <Ionicons name="document-text" size={20} color="#DC2626" />
+                              </View>
+                            ) : (
+                              <Image source={{ uri: d.receipt_image_uri }} style={styles.thumbnail} />
+                            )}
+                            <Text style={[styles.thumbText, { color: theme.primary }]}>
+                              {d.receipt_image_uri?.toLowerCase().endsWith('.pdf') ? 'Abrir PDF' : 'Ver Canhoto'}
+                            </Text>
                           </TouchableOpacity>
                         )}
                       </View>

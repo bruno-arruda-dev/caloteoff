@@ -70,6 +70,11 @@ export async function updateNotificationRule(
   );
 }
 
+export async function toggleNotificationRule(id: string, enabled: boolean): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE notification_rules SET enabled = ? WHERE id = ?', [enabled ? 1 : 0, id]);
+}
+
 export async function deleteNotificationRule(id: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM notification_rules WHERE id = ?', [id]);

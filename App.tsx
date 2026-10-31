@@ -34,6 +34,7 @@ import { BusinessProfileModal } from './src/components/BusinessProfileModal';
 import { MessageTemplatesModal } from './src/components/MessageTemplatesModal';
 import { ThemeSelectorModal } from './src/components/ThemeSelectorModal';
 import { SettingsModal } from './src/components/SettingsModal';
+import { NotificationSettingsModal } from './src/components/NotificationSettingsModal';
 import { PaywallModal } from './src/components/PaywallModal';
 import { generateMessageText, sendWhatsAppMessage } from './src/services/whatsappService';
 import { authenticateWithBiometrics, isBiometricsAvailable } from './src/services/authService';
@@ -89,6 +90,7 @@ function MainScreen() {
   const [templatesVisible, setTemplatesVisible] = useState<boolean>(false);
   const [themesVisible, setThemesVisible] = useState<boolean>(false);
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
+  const [notificationSettingsVisible, setNotificationSettingsVisible] = useState<boolean>(false);
 
   // Carregamento de Dados
   const loadData = useCallback(async () => {
@@ -345,6 +347,7 @@ function MainScreen() {
         onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
         onOpenPixKeys={() => setPixKeysVisible(true)}
         onOpenTemplates={() => setTemplatesVisible(true)}
+        onOpenNotifications={() => setNotificationSettingsVisible(true)}
         onOpenBackup={() => setSettingsVisible(true)}
         onOpenThemes={() => setThemesVisible(true)}
         onOpenSettings={() => setSettingsVisible(true)}
@@ -464,9 +467,16 @@ function MainScreen() {
         onClose={() => setSettingsVisible(false)}
         onOpenThemes={() => setThemesVisible(true)}
         onOpenTemplates={() => setTemplatesVisible(true)}
+        onOpenNotifications={() => setNotificationSettingsVisible(true)}
         onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
         onOpenPixKeys={() => setPixKeysVisible(true)}
         onDataRestored={loadData}
+      />
+
+      <NotificationSettingsModal
+        visible={notificationSettingsVisible}
+        onClose={() => setNotificationSettingsVisible(false)}
+        onRulesChanged={scheduleReminders}
       />
 
       <PaywallModal />
