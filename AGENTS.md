@@ -25,7 +25,16 @@ This is an Expo/React Native mobile application for controlling credit sales ("v
    - Backups antigos NUNCA podem ser rejeitados ou quebrar. Toda alteração de schema exige migração sequencial pura (`V_antiga -> V_nova`) com retrocompatibilidade garantida e testes unitários dedicados.
    - Suporte modular obrigatório: Backup Completo (`FULL`), Apenas Pendências (`PENDING_ONLY`) e Arquivo Morto/Consolidado (`CONSOLIDATED_ARCHIVE`).
 
-## 3. Definition of Done (DoD) & Release Workflow
+## 3. Diretriz Inegociável de Desenvolvimento: Execução Autônoma & Hot Reload Instantâneo
+
+> Documento canônico e passo a passo: [`docs/doctrine/DESENVOLVIMENTO_HOTRELOAD.md`](docs/doctrine/DESENVOLVIMENTO_HOTRELOAD.md).
+
+- **O Usuário é Apenas Testador:** O usuário NUNCA deve ser instruído a rodar comandos de terminal, ligar emulador na mão ou gerenciar processos. A única preocupação dele é testar o aplicativo e validar UX/UI.
+- **Controle de Ligar/Desligar pelo Agente:** O usuário apenas diz quando ligar ("roda o projeto", "liga o app") e quando desligar ("para", "desliga"). O próprio agente executa todo o ecossistema (emulador com flags ideais de tela, ADB, Metro bundler em background e abertura do app).
+- **Hot Reload / Fast Refresh Obrigatório:** Qualquer alteração em componentes, cores, textos ou estilos DEVE ser testada ao vivo via Metro Bundler (Fast Refresh instantâneo). **NUNCA** faça o usuário esperar a compilação de um APK de Release (`gradlew assembleRelease`) para validar alterações visuais.
+- **Compilação de APK é Apenas para Publicação:** O workflow de release (Seção 4) só deve ser executado quando o usuário pedir expressamente para publicar ou gerar uma nova versão oficial.
+
+## 4. Definition of Done (DoD) & Release Workflow
 
 Sempre que concluir o desenvolvimento de uma funcionalidade, ajuste ou correção neste projeto (`caloteoff`), finalize a tarefa executando o ciclo completo de entrega contínua:
 
