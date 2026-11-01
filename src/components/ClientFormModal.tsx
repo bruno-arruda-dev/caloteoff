@@ -190,9 +190,9 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Nome Completo */}
+            {/* Nome */}
             <View style={styles.fieldGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>Nome Completo *</Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Nome *</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -202,7 +202,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     color: theme.textPrimary,
                   },
                 ]}
-                placeholder="Nome e Sobrenome"
+                placeholder="Ex: João da Silva"
                 placeholderTextColor={theme.textMuted}
                 value={name}
                 onChangeText={setName}
