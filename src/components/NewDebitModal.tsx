@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   View,
@@ -54,24 +54,29 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   const [isSelectingClient, setIsSelectingClient] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const resetForm = useCallback(() => {
+    setSelectedClient(initialClient || null);
+    setAmountRaw('');
+    setDueDate(getTodayISO());
+    setDescription('');
+    setPhotoUri(null);
+    setAttachmentName(null);
+    setShowMore(false);
+    setIsSelectingClient(false);
+    setLoading(false);
+    setClientSearch('');
+  }, [initialClient]);
+
   useEffect(() => {
     if (visible) {
-      if (initialClient) {
-        setSelectedClient(initialClient);
-      } else if (clients.length === 1) {
-        setSelectedClient(clients[0]);
-      } else {
-        setSelectedClient(null);
-      }
-      setAmountRaw('');
-      setDueDate(getTodayISO());
-      setDescription('');
-      setPhotoUri(null);
-      setAttachmentName(null);
-      setShowMore(false);
-      setIsSelectingClient(false);
+      resetForm();
     }
-  }, [visible, initialClient, clients]);
+  }, [visible, resetForm]);
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handlePickFromCamera = async () => {
     try {
@@ -221,7 +226,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
       });
 
       onSuccess(entry);
-      onClose();
+      handleClose();
     } catch (err: any) {
       Alert.alert('Erro', err.message || 'Falha ao salvar fiado.');
     } finally {
@@ -242,7 +247,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   });
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
       <View style={[styles.modalOverlay, { backgroundColor: theme.backdrop }]}>
         <View
           style={[
@@ -261,7 +266,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
                 Novo lançamento no caderno
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <Ionicons name="close" size={24} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
