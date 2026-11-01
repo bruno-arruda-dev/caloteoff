@@ -20,6 +20,7 @@ interface SidebarDrawerProps {
   onClose: () => void;
   tradeName: string;
   logoUri?: string | null;
+  onOpenDashboard?: () => void;
   onOpenClients: () => void;
   onOpenBusinessProfile: () => void;
   onOpenPixKeys: () => void;
@@ -37,6 +38,7 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
   onClose,
   tradeName,
   logoUri,
+  onOpenDashboard,
   onOpenClients,
   onOpenBusinessProfile,
   onOpenPixKeys,
@@ -151,6 +153,36 @@ export const SidebarDrawer: React.FC<SidebarDrawerProps> = ({
           <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
             {/* Seção 1: MEU NEGÓCIO & VENDAS */}
             <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>MEU NEGÓCIO & VENDAS</Text>
+
+            {onOpenDashboard && (
+              <TouchableOpacity
+                style={[
+                  styles.menuItem,
+                  {
+                    backgroundColor: theme.primaryBg,
+                    borderColor: theme.primary,
+                  },
+                ]}
+                onPress={() => handleAction(onOpenDashboard)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.iconBox, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="stats-chart" size={20} color="#FFFFFF" />
+                </View>
+                <View style={styles.itemTextContainer}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Painel & Métricas</Text>
+                    <View style={{ backgroundColor: theme.primary, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}>
+                      <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>NOVO</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>
+                    Saúde do fiado, gráficos e indicadores
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.menuItem, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}

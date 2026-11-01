@@ -35,6 +35,7 @@ import { MessageTemplatesModal } from './src/components/MessageTemplatesModal';
 import { ThemeSelectorModal } from './src/components/ThemeSelectorModal';
 import { SettingsModal } from './src/components/SettingsModal';
 import { NotificationSettingsModal } from './src/components/NotificationSettingsModal';
+import { DashboardModal } from './src/components/DashboardModal';
 import { PaywallModal } from './src/components/PaywallModal';
 import { generateMessageText, sendWhatsAppMessage } from './src/services/whatsappService';
 import { authenticateWithBiometrics, isBiometricsAvailable } from './src/services/authService';
@@ -92,6 +93,7 @@ function MainScreen() {
   const [themesVisible, setThemesVisible] = useState<boolean>(false);
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
   const [notificationSettingsVisible, setNotificationSettingsVisible] = useState<boolean>(false);
+  const [dashboardVisible, setDashboardVisible] = useState<boolean>(false);
 
   // Carregamento de Dados (Apenas clientes com saldo devedor na tela principal)
   const loadData = useCallback(async () => {
@@ -348,6 +350,7 @@ function MainScreen() {
         onClose={() => setSidebarVisible(false)}
         tradeName={tradeName}
         logoUri={logoUri}
+        onOpenDashboard={() => setDashboardVisible(true)}
         onOpenClients={() => setClientsModalVisible(true)}
         onOpenBusinessProfile={() => setBusinessProfileVisible(true)}
         onOpenPixKeys={() => setPixKeysVisible(true)}
@@ -482,6 +485,18 @@ function MainScreen() {
         visible={notificationSettingsVisible}
         onClose={() => setNotificationSettingsVisible(false)}
         onRulesChanged={scheduleReminders}
+      />
+
+      <DashboardModal
+        visible={dashboardVisible}
+        onClose={() => setDashboardVisible(false)}
+        onOpenClientDetails={(clientId) => {
+          setDashboardVisible(false);
+          const found = allClients.find((c) => c.id === clientId);
+          if (found) {
+            handleOpenDetails(found);
+          }
+        }}
       />
 
       <PaywallModal />

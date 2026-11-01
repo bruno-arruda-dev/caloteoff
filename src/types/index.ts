@@ -53,6 +53,7 @@ export interface Client {
   credit_balance: number; // saldo a favor
   next_billing_date: string; // YYYY-MM-DD
   deleted_at: string | null; // Soft delete: cliente inativo não pode comprar, mas pode receber cobranças/recibos
+  oldest_pending_date?: string;
   created_at: string;
   updated_at: string;
 }
