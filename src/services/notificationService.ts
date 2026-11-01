@@ -265,6 +265,9 @@ export function evaluateNotificationRuleContent(
  * Reagenda todas as notificações no sistema Android / iOS com base nas regras do banco.
  */
 export async function rescheduleAllNotifications(): Promise<void> {
+  if (Platform.OS === 'web') {
+    return;
+  }
   try {
     await setupNotificationChannel();
     await Notifications.cancelAllScheduledNotificationsAsync();
