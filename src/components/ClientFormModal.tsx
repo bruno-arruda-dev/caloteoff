@@ -673,45 +673,50 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       }}
                     />
 
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            flex: 1,
-                            backgroundColor: theme.card,
-                            borderColor: theme.border,
-                            color: theme.textPrimary,
-                          },
-                        ]}
-                        placeholder="Nº"
-                        placeholderTextColor={theme.textMuted}
-                        value={addr.number}
-                        onChangeText={(val) => {
-                          const next = [...addresses];
-                          next[idx].number = val;
-                          setAddresses(next);
-                        }}
-                      />
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            flex: 2,
-                            backgroundColor: theme.card,
-                            borderColor: theme.border,
-                            color: theme.textPrimary,
-                          },
-                        ]}
-                        placeholder="Bairro"
-                        placeholderTextColor={theme.textMuted}
-                        value={addr.neighborhood}
-                        onChangeText={(val) => {
-                          const next = [...addresses];
-                          next[idx].neighborhood = val;
-                          setAddresses(next);
-                        }}
-                      />
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, width: '100%' }}>
+                      <View style={{ width: 85, flexShrink: 0 }}>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            {
+                              width: '100%',
+                              backgroundColor: theme.card,
+                              borderColor: theme.border,
+                              color: theme.textPrimary,
+                            },
+                          ]}
+                          placeholder="Nº"
+                          placeholderTextColor={theme.textMuted}
+                          value={addr.number}
+                          onChangeText={(val) => {
+                            const next = [...addresses];
+                            next[idx].number = val;
+                            setAddresses(next);
+                          }}
+                        />
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <TextInput
+                          style={[
+                            styles.input,
+                            {
+                              width: '100%',
+                              minWidth: 0,
+                              backgroundColor: theme.card,
+                              borderColor: theme.border,
+                              color: theme.textPrimary,
+                            },
+                          ]}
+                          placeholder="Bairro"
+                          placeholderTextColor={theme.textMuted}
+                          value={addr.neighborhood}
+                          onChangeText={(val) => {
+                            const next = [...addresses];
+                            next[idx].neighborhood = val;
+                            setAddresses(next);
+                          }}
+                        />
+                      </View>
                     </View>
 
                     <TextInput
@@ -805,6 +810,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 14,
     fontSize: 15,
+    minWidth: 0,
   },
   showMoreToggle: {
     flexDirection: 'row',
@@ -870,6 +876,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 10,
+    overflow: 'hidden',
   },
   itemHeader: {
     flexDirection: 'row',
