@@ -47,6 +47,7 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
   const { theme } = useTheme();
   const keyboardHeight = useKeyboardBottomInset();
   const inputRef = useRef<TextInput>(null);
+  const tabsScrollRef = useRef<ScrollView>(null);
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [selectedKey, setSelectedKey] = useState<MessageTemplateKey>('friendly_reminder');
@@ -60,6 +61,21 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
       loadTemplates();
     }
   }, [visible]);
+
+  const getTemplateMeta = (key: string): { icon: keyof typeof Ionicons.glyphMap; color: string } => {
+    switch (key) {
+      case 'friendly_reminder':
+        return { icon: 'time-outline', color: '#0284C7' };
+      case 'overdue_collection':
+        return { icon: 'alert-circle-outline', color: '#DC2626' };
+      case 'full_receipt':
+        return { icon: 'checkmark-circle-outline', color: '#16A34A' };
+      case 'partial_receipt':
+        return { icon: 'cash-outline', color: '#7C3AED' };
+      default:
+        return { icon: 'chatbubble-outline', color: '#64748B' };
+    }
+  };
 
   const loadTemplates = async () => {
     try {
@@ -77,11 +93,35 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
     }
   };
 
-  const handleSelectTemplate = (t: MessageTemplate) => {
+  const handleSelectTemplate = (t: MessageTemplate, index?: number) => {
     setSelectedKey(t.template_key);
     setCurrentTitle(t.title);
     setEditingBody(t.body);
     setSelection({ start: t.body.length, end: t.body.length });
+
+    const idx = index !== undefined ? index : templates.findIndex((item) => item.template_key === t.template_key);
+    if (idx >= 0 && tabsScrollRef.current) {
+      tabsScrollRef.current.scrollTo({
+        x: Math.max(0, idx * 135 - 20),
+        animated: true,
+      });
+    }
+  };
+
+  const currentIndex = templates.findIndex((t) => t.template_key === selectedKey);
+
+  const handlePrevTab = () => {
+    if (currentIndex > 0) {
+      const prev = templates[currentIndex - 1];
+      handleSelectTemplate(prev, currentIndex - 1);
+    }
+  };
+
+  const handleNextTab = () => {
+    if (currentIndex >= 0 && currentIndex < templates.length - 1) {
+      const next = templates[currentIndex + 1];
+      handleSelectTemplate(next, currentIndex + 1);
+    }
   };
 
   const handleInsertTag = (tag: string) => {
@@ -179,40 +219,126 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Abas Superiores de Seleção de Modelo */}
-          <View style={[styles.tabsWrapper, { borderBottomColor: theme.borderLight }]}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContainer}>
-              {templates.map((tpl) => {
+          {/* Abas Superiores de Seleção de Modelo com Affordance e Dica de Scroll */}
+          <View style={[styles.tabsWrapper, { borderBottomColor: theme.borderLight, backgroundColor: theme.cardSecondary }]}>
+            {/* Header de Orientação de Rolagem */}
+            <View style={styles.tabsHeaderRow}>
+              <View style={styles.tabsCountBadge}>
+                <Ionicons name="chatbubbles-outline" size={13} color={theme.primary} />
+                <Text style={[styles.tabsCountText, { color: theme.textSecondary }]}>
+                  MODELO {currentIndex >= 0 ? currentIndex + 1 : 1} DE {templates.length}
+                </Text>
+              </View>
+
+              <View style={[styles.swipeHintBadge, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
+                <Ionicons name="swap-horizontal-outline" size={13} color={theme.primary} />
+                <Text style={[styles.swipeHintText, { color: theme.textSecondary }]}>
+                  Deslize para ver todos 👉
+                </Text>
+              </View>
+            </View>
+
+            {/* Scroll Horizontal com Setas Laterais de Navegação */}
+            <View style={styles.tabsScrollOuter}>
+              {currentIndex > 0 && (
+                <TouchableOpacity
+                  style={[styles.arrowButton, styles.arrowLeft, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={handlePrevTab}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Modelo anterior"
+                >
+                  <Ionicons name="chevron-back" size={16} color={theme.textPrimary} />
+                </TouchableOpacity>
+              )}
+
+              <ScrollView
+                ref={tabsScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tabsContainer}
+              >
+                {templates.map((tpl, idx) => {
+                  const isSelected = selectedKey === tpl.template_key;
+                  const meta = getTemplateMeta(tpl.template_key);
+                  return (
+                    <TouchableOpacity
+                      key={tpl.id}
+                      style={[
+                        styles.tabItem,
+                        {
+                          backgroundColor: isSelected ? theme.primary : theme.card,
+                          borderColor: isSelected ? theme.primary : theme.border,
+                        },
+                      ]}
+                      onPress={() => handleSelectTemplate(tpl, idx)}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.tabIconBadge,
+                          {
+                            backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : `${meta.color}15`,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={meta.icon}
+                          size={14}
+                          color={isSelected ? theme.primaryText : meta.color}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.tabText,
+                          {
+                            color: isSelected ? theme.primaryText : theme.textPrimary,
+                            fontWeight: isSelected ? '700' : '600',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {tpl.title.split('(')[0].trim()}
+                      </Text>
+                      {isSelected && (
+                        <View style={[styles.activePillDot, { backgroundColor: theme.primaryText }]} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {currentIndex < templates.length - 1 && (
+                <TouchableOpacity
+                  style={[styles.arrowButton, styles.arrowRight, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={handleNextTab}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Próximo modelo"
+                >
+                  <Ionicons name="chevron-forward" size={16} color={theme.textPrimary} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Indicador de Bolinhas Estilo Carrossel */}
+            <View style={styles.dotsIndicatorRow}>
+              {templates.map((tpl, idx) => {
                 const isSelected = selectedKey === tpl.template_key;
                 return (
                   <TouchableOpacity
-                    key={tpl.id}
+                    key={`dot-${tpl.id}`}
+                    onPress={() => handleSelectTemplate(tpl, idx)}
+                    activeOpacity={0.7}
                     style={[
-                      styles.tabItem,
+                      styles.indicatorDot,
                       {
-                        backgroundColor: isSelected ? theme.primary : theme.cardSecondary,
-                        borderColor: isSelected ? theme.primary : theme.border,
+                        backgroundColor: isSelected ? theme.primary : theme.border,
+                        width: isSelected ? 22 : 6,
                       },
                     ]}
-                    onPress={() => handleSelectTemplate(tpl)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.tabText,
-                        {
-                          color: isSelected ? theme.primaryText : theme.textPrimary,
-                          fontWeight: isSelected ? '700' : '500',
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {tpl.title.split('(')[0].trim()}
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
 
           <ScrollView
@@ -371,20 +497,104 @@ const styles = StyleSheet.create({
   },
   tabsWrapper: {
     borderBottomWidth: 1,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  tabsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  tabsCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  tabsCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  swipeHintBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  swipeHintText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  tabsScrollOuter: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  arrowButton: {
+    position: 'absolute',
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  arrowLeft: {
+    left: 6,
+  },
+  arrowRight: {
+    right: 6,
   },
   tabsContainer: {
     paddingHorizontal: 16,
     gap: 8,
+    alignItems: 'center',
   },
   tabItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 9,
+    borderRadius: 22,
     borderWidth: 1,
   },
+  tabIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tabText: {
-    fontSize: 12,
+    fontSize: 13,
+  },
+  activePillDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginLeft: 2,
+  },
+  dotsIndicatorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+  },
+  indicatorDot: {
+    height: 6,
+    borderRadius: 3,
   },
   body: {
     padding: 18,
