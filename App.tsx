@@ -55,6 +55,7 @@ function MainScreen() {
 
   // Estados principais
   const [clients, setClients] = useState<Client[]>([]);
+  const [allClients, setAllClients] = useState<Client[]>([]);
   const [openDebitsMap, setOpenDebitsMap] = useState<Record<string, DebitEntry[]>>({});
   const [tradeName, setTradeName] = useState<string>('Irineu');
   const [logoUri, setLogoUri] = useState<string | null>(null);
@@ -92,21 +93,23 @@ function MainScreen() {
   const [settingsVisible, setSettingsVisible] = useState<boolean>(false);
   const [notificationSettingsVisible, setNotificationSettingsVisible] = useState<boolean>(false);
 
-  // Carregamento de Dados
+  // Carregamento de Dados (Apenas clientes com saldo devedor na tela principal)
   const loadData = useCallback(async () => {
     try {
-      const [list, profile] = await Promise.all([
-        getClients(sortOption, searchQuery),
+      const [debtorList, fullList, profile] = await Promise.all([
+        getClients(sortOption, searchQuery, { onlyDebtors: true }),
+        getClients('alphabetical'),
         getBusinessProfile(),
       ]);
-      setClients(list);
+      setClients(debtorList);
+      setAllClients(fullList);
       setTradeName(profile.trade_name || 'Irineu');
       setLogoUri(profile.logo_uri);
 
       // Carrega débitos abertos para os cards
       const debitsEntries: Record<string, DebitEntry[]> = {};
       await Promise.all(
-        list.map(async (c) => {
+        debtorList.map(async (c) => {
           const debits = await getClientDebits(c.id, 'pending');
           debitsEntries[c.id] = debits;
         })
@@ -278,10 +281,10 @@ function MainScreen() {
         </View>
       </View>
 
-      {/* Barra Sub-header com Filtro Compacto & Contador de Clientes */}
+      {/* Barra Sub-header com Filtro Compacto & Contador de Clientes Devedores */}
       <View style={styles.listSubHeader}>
         <Text style={[styles.listCounterText, { color: theme.textMuted }]}>
-          {clients.length} {clients.length === 1 ? 'cliente' : 'clientes'}
+          {clients.length} {clients.length === 1 ? 'devedor' : 'devedores'}
         </Text>
 
         <TouchableOpacity
@@ -296,7 +299,7 @@ function MainScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Lista de Clientes */}
+      {/* Lista de Clientes Devedores */}
       <FlatList
         data={clients}
         keyExtractor={(item) => item.id}
@@ -313,12 +316,14 @@ function MainScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="book-outline" size={54} color={theme.textMuted} />
+            <Ionicons name="checkmark-done-circle-outline" size={54} color={theme.income} />
             <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              Caderno de Fiado Limpo!
+              {searchQuery ? 'Nenhum Devedor Encontrado' : 'Nenhum Devedor no Momento!'}
             </Text>
             <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-              Nenhum cliente ou fiado encontrado. Toque no botão (+) abaixo para pendurar a primeira conta.
+              {searchQuery
+                ? 'Nenhum cliente com débito pendente coincide com a busca.'
+                : 'Todos os clientes estão com as contas em dia. Toque no botão (+) Pendurar para registrar uma nova compra fiada.'}
             </Text>
           </View>
         }
@@ -392,7 +397,7 @@ function MainScreen() {
       {/* Modais de Fluxos Financeiros */}
       <NewDebitModal
         visible={newDebitVisible}
-        clients={clients}
+        clients={allClients}
         initialClient={initialClientForDebit}
         onClose={() => setNewDebitVisible(false)}
         onSuccess={handleNewDebitSuccess}

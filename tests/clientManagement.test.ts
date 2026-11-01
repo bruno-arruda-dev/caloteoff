@@ -63,4 +63,34 @@ describe('Client Management & Soft Delete Invariants', () => {
     const canMakeNewPurchase = !deletedClient.deleted_at;
     expect(canMakeNewPurchase).toBe(false);
   });
+
+  it('strictly isolates debtor clients (> 0) from clients with zero debt for main screen display', () => {
+    const clientsWithZeroDebt: Client[] = [
+      ...sampleClients,
+      {
+        id: 'client-3-zero',
+        name: 'Suzana Sarah',
+        nickname: 'Suzana',
+        whatsapp_primary: '62999990000',
+        phones: [],
+        addresses: [],
+        credit_limit: 200,
+        limit_policy: 'AVISAR_E_PERMITIR',
+        billing_cycle: 'MONTHLY',
+        billing_day: 10,
+        notes: '',
+        current_balance: 0,
+        credit_balance: 0,
+        next_billing_date: '2026-11-10',
+        deleted_at: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const activeDebtors = clientsWithZeroDebt.filter((c) => !c.deleted_at && c.current_balance > 0.001);
+    expect(activeDebtors.length).toBe(1);
+    expect(activeDebtors[0].id).toBe('client-1');
+    expect(activeDebtors.some((c) => c.id === 'client-3-zero')).toBe(false);
+  });
 });

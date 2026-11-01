@@ -5,6 +5,7 @@ import { getDatabase } from './schema';
 
 export interface GetClientsOptions {
   status?: 'all' | 'active' | 'deleted';
+  onlyDebtors?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -85,7 +86,12 @@ export async function getClients(
     };
   });
 
-  const sorted = sortClientsList(clients, sortOption);
+  let filteredClients = clients;
+  if (options?.onlyDebtors) {
+    filteredClients = clients.filter((c) => c.current_balance > 0.001);
+  }
+
+  const sorted = sortClientsList(filteredClients, sortOption);
 
   // Paginação se informada
   if (options?.page && options?.pageSize) {
