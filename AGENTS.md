@@ -34,7 +34,7 @@ This is an Expo/React Native mobile application for controlling credit sales ("v
 - **Preferência de Ambiente:**
   - **Primário (Padrão): Celular Físico via Expo Go** (`exp://<IP-Local>:8081`). O agente sobe o Metro e informa a URL/QR para o usuário abrir no próprio smartphone.
   - **Secundário: Navegador Web** (`npx expo start --web`). Usado quando o usuário pedir para testar no PC / navegador. O agente inicia o web e abre `http://localhost:8081`.
-  - **Emulador Android Local (Desencorajado):** Não subir automaticamente. O emulador no Windows é instável/pesado ("bugado") e só deve ser acionado sob pedido explícito do usuário.
+  - **Emulador Android Local (Banido):** Emuladores locais são proibidos no desenvolvimento cotidiano deste projeto devido a bugs e lentidão no Windows. Scripts como `.bat` de emulador foram excluídos. O desenvolvimento ocorre 100% via Expo Go ou Web.
 - **Hot Reload / Fast Refresh Obrigatório:** Qualquer alteração em componentes, cores, textos ou estilos DEVE ser testada ao vivo via Metro Bundler (Fast Refresh instantâneo). **NUNCA** faça o usuário esperar a compilação de um APK de Release (`gradlew assembleRelease`) para validar alterações visuais.
 - **Compilação de APK é Apenas para Publicação:** O workflow de release (Seção 4) só deve ser executado quando o usuário pedir expressamente para publicar ou gerar uma nova versão oficial.
 

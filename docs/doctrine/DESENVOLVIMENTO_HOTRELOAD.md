@@ -18,27 +18,28 @@ O usuário deste projeto atua exclusivamente como **testador de produto e experi
    - Toda alteração de tela, cor, texto, espaçamento, validação ou regra deve refletir **imediatamente e ao vivo** via Metro Bundler (Fast Refresh).
    - **NUNCA** faça o usuário esperar a compilação de um APK de Release (`gradlew assembleRelease` leva minutos) apenas para ver um ajuste visual.
    - O fluxo de Release / APK de produção (DoD) é reservado **exclusivamente** para quando o usuário disser explicitamente *"publique"*, *"gere a versão oficial"* ou *"faça a release"*.
+4. **Sem Emuladores Locais:** Emuladores Android locais são proibidos neste projeto por instabilidade e consumo excessivo no Windows. O ecossistema roda exclusivamente via **Expo Go** (celular físico) ou **Navegador Web**. Scripts e arquivos de emulador (como arquivos `.bat`) foram permanentemente excluídos.
 
 ---
 
-## 2. Modos de Execução & Preferências do Usuário
+## 2. Modos de Execução Homologados
 
-O projeto oferece suporte a três modalidades de teste, com prioridades estritas:
+O projeto suporta exclusivamente duas modalidades de teste em desenvolvimento:
 
-### 🏆 Modo 1: Celular Físico via Expo Go (PREFERÊNCIA PRIMÁRIA)
-- **Como o usuário testa:** Abre o aplicativo **Expo Go** no smartphone conectado na mesma rede Wi-Fi e escaneia o QR Code ou insere o link `exp://<IP-Local>:8081`.
+### 🏆 Modo 1: Celular Físico via Expo Go (PREFERÊNCIA PRIMÁRIA DO USUÁRIO)
+- **Como o usuário testa:** Abre o aplicativo **Expo Go** no smartphone pessoal conectado na mesma rede Wi-Fi e escaneia o QR Code ou insere a URL `exp://<IP-Local>:8081`.
 - **Ação do Agente:**
   1. Identifica o IP local da máquina (`ipconfig` / Wi-Fi).
-  2. Sobe o Expo em background:
+  2. Inicia o servidor Expo em background:
      ```powershell
      npx expo start
      ```
-  3. Informa a URL amigável (ex: `exp://192.168.1.11:8081`) para o usuário abrir no aparelho.
+  3. Informa a URL amigável (ex: `exp://192.168.1.11:8081`) para o usuário conectar instantaneamente no aparelho.
 
 ### 🌐 Modo 2: Navegador Web no PC (MODO WEB DESKTOP)
-- **Quando usar:** Quando o usuário pedir expressamente para testar no computador / navegador ("roda no navegador", "abre no browser").
+- **Quando usar:** Quando o usuário pedir para testar no computador / navegador ("roda no navegador", "abre no browser").
 - **Ação do Agente:**
-  1. Inicia o Metro com target web em background (`IsDaemon: true`):
+  1. Inicia o Metro com suporte a Web em background (`IsDaemon: true`):
      ```powershell
      npx expo start --web
      ```
@@ -46,11 +47,7 @@ O projeto oferece suporte a três modalidades de teste, com prioridades estritas
      ```powershell
      Start-Process "http://localhost:8081"
      ```
-  3. O usuário valida componentes e fluxos diretamente na aba do navegador com Fast Refresh.
-
-### ⚠️ Modo 3: Emulador Android Local (DESENCORAJADO / APENAS SOB DEMANDA EXPLÍCITA)
-- **Diretriz:** O emulador Android no Windows consome recursos excessivos e pode travar na inicialização com GPUs dedicadas ou aceleração de snapshot ("bugado").
-- **Regra:** **NUNCA** inicie o emulador por conta própria. Apenas suba o emulador se o usuário pedir com todas as letras: *"abra no emulador Android"*.
+  3. O usuário valida componentes e fluxos na aba do navegador com Fast Refresh imediato.
 
 ---
 
@@ -82,10 +79,6 @@ Quando o usuário pedir para parar, desligar ou encerrar a sessão de testes:
 2. **Garantir liberação da porta 8081:**
    ```powershell
    Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
-   ```
-3. **Garantir que nenhum emulador residual fique rodando:**
-   ```powershell
-   Stop-Process -Name "emulator", "qemu-system-x86_64" -Force -ErrorAction SilentlyContinue
    ```
 
 ---
