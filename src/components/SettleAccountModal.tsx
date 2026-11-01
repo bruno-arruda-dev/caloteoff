@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Client, PaymentRecord } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
-import { formatCurrency, parseCurrencyInput } from '../utils/currency';
+import { formatCurrency, parseCurrencyInput, formatCurrencyInput } from '../utils/currency';
 import { getTodayISO } from '../utils/date';
 import { calculateSettlement } from '../utils/balanceCalculator';
 import { processPayment } from '../database/paymentRepository';
@@ -43,7 +43,7 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
   useEffect(() => {
     if (visible && client) {
       const debt = Math.max(0, client.current_balance);
-      setAmountRaw(debt > 0 ? debt.toFixed(2).replace('.', ',') : '');
+      setAmountRaw(debt > 0 ? formatCurrencyInput(debt.toFixed(2)) : '');
       setPaymentDate(getTodayISO());
       setNotes('');
     }
@@ -132,7 +132,7 @@ export const SettleAccountModal: React.FC<SettleAccountModalProps> = ({
                 placeholderTextColor={theme.textMuted}
                 keyboardType="numeric"
                 value={amountRaw}
-                onChangeText={setAmountRaw}
+                onChangeText={(val) => setAmountRaw(formatCurrencyInput(val))}
                 autoFocus
               />
             </View>

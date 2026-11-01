@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AddressContact, BillingCycle, Client, LimitPolicy, PhoneContact } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
-import { parseCurrencyInput } from '../utils/currency';
+import { parseCurrencyInput, formatCurrencyInput } from '../utils/currency';
 import { createClient, updateClient, countActiveDebtorClients } from '../database/clientRepository';
 import { useLicense } from '../theme/LicenseContext';
 
@@ -53,7 +53,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         setName(client.name);
         setNickname(client.nickname);
         setWhatsapp(client.whatsapp_primary);
-        setLimitRaw(client.credit_limit ? client.credit_limit.toFixed(2).replace('.', ',') : '');
+        setLimitRaw(client.credit_limit ? formatCurrencyInput(client.credit_limit.toFixed(2)) : '');
         setLimitPolicy(client.limit_policy || 'PADRAO_GLOBAL');
         setBillingCycle(client.billing_cycle);
         setBillingDay(String(client.billing_day));
@@ -287,7 +287,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                     placeholderTextColor={theme.textMuted}
                     keyboardType="numeric"
                     value={limitRaw}
-                    onChangeText={setLimitRaw}
+                    onChangeText={(val) => setLimitRaw(formatCurrencyInput(val))}
                   />
                 </View>
 

@@ -16,7 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Client, DebitEntry } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
-import { formatCurrency, parseCurrencyInput } from '../utils/currency';
+import { formatCurrency, parseCurrencyInput, formatCurrencyInput } from '../utils/currency';
 import { formatDateBR, getTodayISO } from '../utils/date';
 import { checkCreditLimit } from '../utils/balanceCalculator';
 import { addDebitEntry } from '../database/entryRepository';
@@ -386,7 +386,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
                 placeholderTextColor={theme.textMuted}
                 keyboardType="numeric"
                 value={amountRaw}
-                onChangeText={setAmountRaw}
+                onChangeText={(val) => setAmountRaw(formatCurrencyInput(val))}
               />
             </View>
 
