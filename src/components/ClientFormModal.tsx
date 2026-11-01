@@ -190,29 +190,6 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Cadastro Rápido: Apelido / Como é conhecido */}
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Apelido / Como é conhecido no balcão *
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.cardSecondary,
-                    borderColor: theme.border,
-                    color: theme.textPrimary,
-                    fontWeight: '700',
-                  },
-                ]}
-                placeholder="Ex: Seu Zé da Padaria, Tonho, Maria do Bolo..."
-                placeholderTextColor={theme.textMuted}
-                value={nickname}
-                onChangeText={setNickname}
-                autoFocus={!client}
-              />
-            </View>
-
             {/* Nome Completo */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: theme.textSecondary }]}>Nome Completo *</Text>
@@ -229,6 +206,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 placeholderTextColor={theme.textMuted}
                 value={name}
                 onChangeText={setName}
+                autoFocus={!client}
               />
             </View>
 
@@ -264,12 +242,33 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 color={theme.primary}
               />
               <Text style={[styles.showMoreText, { color: theme.primary }]}>
-                {showMore ? 'Menos opções' : 'Mostrar mais (Limite de fiado, dia de cobrança...)'}
+                {showMore ? 'Menos opções' : 'Mostrar mais (Apelido, limite de fiado, dia de cobrança...)'}
               </Text>
             </TouchableOpacity>
 
             {showMore && (
               <View style={styles.advancedBox}>
+                {/* Apelido / Como é conhecido */}
+                <View style={styles.fieldGroup}>
+                  <Text style={[styles.label, { color: theme.textSecondary }]}>
+                    Apelido / Como é conhecido no balcão
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.cardSecondary,
+                        borderColor: theme.border,
+                        color: theme.textPrimary,
+                        fontWeight: '700',
+                      },
+                    ]}
+                    placeholder="Ex: Seu Zé da Padaria, Tonho, Maria do Bolo (opcional)"
+                    placeholderTextColor={theme.textMuted}
+                    value={nickname}
+                    onChangeText={setNickname}
+                  />
+                </View>
                 {/* Limite de Fiado */}
                 <View style={styles.fieldGroup}>
                   <Text style={[styles.label, { color: theme.textSecondary }]}>
