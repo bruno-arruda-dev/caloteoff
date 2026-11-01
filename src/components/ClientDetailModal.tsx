@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Client, DebitEntry, PaymentRecord } from '../types';
@@ -17,6 +18,7 @@ import { formatCurrency } from '../utils/currency';
 import { formatDateBR, formatDateTimeBR, getTodayISO, addDaysToISO } from '../utils/date';
 import { getClientDebits } from '../database/entryRepository';
 import { getClientPayments } from '../database/paymentRepository';
+import { deleteClient } from '../database/clientRepository';
 import { generateMessageText, sendWhatsAppMessage } from '../services/whatsappService';
 import { shareClientStatementPdf } from '../services/pdfExportService';
 import * as Sharing from 'expo-sharing';
@@ -52,6 +54,8 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [customEndDate, setCustomEndDate] = useState<string>(getTodayISO());
   const [visibleCount, setVisibleCount] = useState<number>(15);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState<boolean>(false);
+  const [isDeletingClient, setIsDeletingClient] = useState<boolean>(false);
 
   useEffect(() => {
     if (visible && client) {
@@ -201,10 +205,25 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => onEditClient(client)} style={styles.iconBtn}>
+            <TouchableOpacity
+              onPress={() => onEditClient(client)}
+              style={styles.iconBtn}
+              accessibilityLabel="Editar cliente"
+            >
               <Ionicons name="pencil" size={20} color={theme.primary} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.iconBtn}>
+            <TouchableOpacity
+              onPress={() => setConfirmDeleteVisible(true)}
+              style={styles.iconBtn}
+              accessibilityLabel="Desativar cliente"
+            >
+              <Ionicons name="trash-outline" size={20} color="#DC2626" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.iconBtn}
+              accessibilityLabel="Fechar"
+            >
               <Ionicons name="close" size={24} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -618,6 +637,115 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </View>
             </Modal>
           )}
+
+          {/* MODAL DE CONFIRMAÇÃO DE INATIVAÇÃO DE CLIENTE (100% CROSS-PLATFORM) */}
+          <Modal
+            visible={confirmDeleteVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              if (!isDeletingClient) setConfirmDeleteVisible(false);
+            }}
+          >
+            <View style={styles.confirmBackdrop}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => {
+                  if (!isDeletingClient) setConfirmDeleteVisible(false);
+                }}
+              />
+              <View style={[styles.confirmCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="trash-outline" size={28} color="#DC2626" />
+                </View>
+
+                <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
+                  Desativar Cliente
+                </Text>
+
+                <Text style={[styles.confirmName, { color: theme.primary }]}>
+                  {client ? client.nickname || client.name : ''}
+                </Text>
+
+                {client && client.current_balance > 0.001 ? (
+                  <View style={[styles.confirmWarningBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                    <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.confirmWarningTitle, { color: '#991B1B' }]}>
+                        Saldo Devedor: {maskCurrency(formatCurrency(client.current_balance))}
+                      </Text>
+                      <Text style={[styles.confirmWarningDesc, { color: '#B91C1C' }]}>
+                        Este cliente possui débito pendente.
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={[styles.confirmInfoBox, { backgroundColor: theme.cardSecondary }]}>
+                  <View style={styles.confirmInfoRow}>
+                    <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                    <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                      Não poderá realizar novas compras fiadas.
+                    </Text>
+                  </View>
+                  <View style={styles.confirmInfoRow}>
+                    <Ionicons name="checkmark-circle-outline" size={16} color="#16A34A" />
+                    <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                      Cobranças, extratos e acertos continuam normais.
+                    </Text>
+                  </View>
+                  <View style={styles.confirmInfoRow}>
+                    <Ionicons name="refresh-circle-outline" size={16} color="#4F46E5" />
+                    <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                      Pode ser reativado na tela de Gestão de Clientes.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.confirmActionsRow}>
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmCancelBtn, { borderColor: theme.border }]}
+                    onPress={() => setConfirmDeleteVisible(false)}
+                    disabled={isDeletingClient}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.confirmCancelText, { color: theme.textSecondary }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmDeleteBtn, { backgroundColor: '#DC2626' }]}
+                    onPress={async () => {
+                      if (!client) return;
+                      setIsDeletingClient(true);
+                      try {
+                        await deleteClient(client.id);
+                        setConfirmDeleteVisible(false);
+                        onClose();
+                      } catch (err: any) {
+                        console.warn('Erro ao desativar cliente:', err);
+                      } finally {
+                        setIsDeletingClient(false);
+                      }
+                    }}
+                    disabled={isDeletingClient}
+                    activeOpacity={0.8}
+                  >
+                    {isDeletingClient ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                        <Text style={styles.confirmDeleteText}>Sim, Inativar</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </View>
     </Modal>
@@ -945,5 +1073,105 @@ const styles = StyleSheet.create({
   applyCustomBtnText: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    padding: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  confirmIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  confirmName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  confirmWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    width: '100%',
+    marginBottom: 12,
+  },
+  confirmWarningTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmWarningDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  confirmInfoBox: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 18,
+  },
+  confirmInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  confirmInfoText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  confirmCancelBtn: {
+    borderWidth: 1,
+  },
+  confirmCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmDeleteBtn: {},
+  confirmDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

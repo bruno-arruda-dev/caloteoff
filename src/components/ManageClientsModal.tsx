@@ -48,6 +48,16 @@ export const ManageClientsModal: React.FC<ManageClientsModalProps> = ({
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, 3000);
+  };
 
   const loadData = useCallback(
     async (pageToLoad: number = 1, append: boolean = false) => {
@@ -96,35 +106,31 @@ export const ManageClientsModal: React.FC<ManageClientsModalProps> = ({
   };
 
   const handleSoftDelete = (client: Client) => {
-    Alert.alert(
-      'Desativar Cliente',
-      `Deseja inativar ${client.nickname || client.name}?\n\n• O cliente não poderá realizar novas compras fiadas.\n• As cobranças no WhatsApp, extratos e acertos de contas continuarão funcionando normalmente.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Desativar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteClient(client.id);
-              await loadData(1, false);
-            } catch (err: any) {
-              Alert.alert('Erro', err.message || 'Falha ao desativar cliente');
-            }
-          },
-        },
-      ]
-    );
+    setClientToDelete(client);
+  };
+
+  const confirmSoftDelete = async () => {
+    if (!clientToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteClient(clientToDelete.id);
+      const name = clientToDelete.nickname || clientToDelete.name;
+      setClientToDelete(null);
+      await loadData(1, false);
+      showToast(`${name} foi inativado.`);
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Falha ao desativar cliente');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleRestore = async (client: Client) => {
     try {
       await restoreClient(client.id);
-      Alert.alert(
-        'Cliente Reativado',
-        `${client.nickname || client.name} foi reativado e já pode realizar compras fiadas novamente!`
-      );
+      const name = client.nickname || client.name;
       await loadData(1, false);
+      showToast(`${name} foi reativado com sucesso!`);
     } catch (err: any) {
       Alert.alert('Erro', err.message || 'Falha ao reativar cliente');
     }
@@ -434,8 +440,113 @@ export const ManageClientsModal: React.FC<ManageClientsModalProps> = ({
             <Ionicons name="person-add" size={20} color="#FFFFFF" />
             <Text style={styles.fabText}>Novo Cliente</Text>
           </TouchableOpacity>
+
+          {/* Toast de Notificação */}
+          {toastMessage && (
+            <View style={[styles.toastContainer, { backgroundColor: theme.textPrimary }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+              <Text style={[styles.toastText, { color: theme.card }]}>{toastMessage}</Text>
+            </View>
+          )}
         </View>
       </View>
+
+      {/* MODAL DE CONFIRMAÇÃO DE INATIVAÇÃO DE CLIENTE (100% CROSS-PLATFORM) */}
+      <Modal
+        visible={!!clientToDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeleting) setClientToDelete(null);
+        }}
+      >
+        <View style={styles.confirmBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              if (!isDeleting) setClientToDelete(null);
+            }}
+          />
+          <View style={[styles.confirmCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.confirmIconCircle, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="trash-outline" size={28} color="#DC2626" />
+            </View>
+
+            <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
+              Desativar Cliente
+            </Text>
+
+            <Text style={[styles.confirmName, { color: theme.primary }]}>
+              {clientToDelete ? clientToDelete.nickname || clientToDelete.name : ''}
+            </Text>
+
+            {clientToDelete && clientToDelete.current_balance > 0.001 ? (
+              <View style={[styles.confirmWarningBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+                <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.confirmWarningTitle, { color: '#991B1B' }]}>
+                    Saldo Devedor: {maskCurrency(formatCurrency(clientToDelete.current_balance))}
+                  </Text>
+                  <Text style={[styles.confirmWarningDesc, { color: '#B91C1C' }]}>
+                    Este cliente ainda possui débito pendente.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={[styles.confirmInfoBox, { backgroundColor: theme.cardSecondary }]}>
+              <View style={styles.confirmInfoRow}>
+                <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                  Não poderá realizar novas compras fiadas.
+                </Text>
+              </View>
+              <View style={styles.confirmInfoRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#16A34A" />
+                <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                  Cobranças, extratos e acertos continuam normais.
+                </Text>
+              </View>
+              <View style={styles.confirmInfoRow}>
+                <Ionicons name="refresh-circle-outline" size={16} color="#4F46E5" />
+                <Text style={[styles.confirmInfoText, { color: theme.textSecondary }]}>
+                  Pode ser reativado na aba Inativos.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.confirmActionsRow}>
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.confirmCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setClientToDelete(null)}
+                disabled={isDeleting}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.confirmCancelText, { color: theme.textSecondary }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmBtn, styles.confirmDeleteBtn, { backgroundColor: '#DC2626' }]}
+                onPress={confirmSoftDelete}
+                disabled={isDeleting}
+                activeOpacity={0.8}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.confirmDeleteText}>Sim, Inativar</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -648,6 +759,127 @@ const styles = StyleSheet.create({
   fabText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    padding: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  confirmIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  confirmName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  confirmWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    width: '100%',
+    marginBottom: 12,
+  },
+  confirmWarningTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  confirmWarningDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  confirmInfoBox: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 18,
+  },
+  confirmInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  confirmInfoText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 16,
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  confirmCancelBtn: {
+    borderWidth: 1,
+  },
+  confirmCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmDeleteBtn: {},
+  confirmDeleteText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 9999,
+  },
+  toastText: {
+    fontSize: 13,
     fontWeight: '700',
   },
 });
