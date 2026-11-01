@@ -20,7 +20,7 @@ import { BackupType } from '../services/backup/backupTypes';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../services/notificationService';
 import { LimitPolicy } from '../types';
 
-const APP_VERSION_STRING = 'v1.0.5 (Build 6)';
+const APP_VERSION_STRING = 'v1.0.6 (Build 7)';
 
 interface SettingsModalProps {
   visible: boolean;

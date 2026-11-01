@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { PrivacyProvider, usePrivacy } from './src/theme/PrivacyContext';
 import { LicenseProvider, useLicense } from './src/theme/LicenseContext';
+import { AlertProvider } from './src/theme/AlertContext';
 import { Client, DebitEntry, PaymentRecord, SortOption } from './src/types';
 import { getClients } from './src/database/clientRepository';
 import { getClientDebits } from './src/database/entryRepository';
@@ -560,7 +561,9 @@ export default function App() {
     <ThemeProvider>
       <PrivacyProvider>
         <LicenseProvider>
-          <MainScreen />
+          <AlertProvider>
+            <MainScreen />
+          </AlertProvider>
         </LicenseProvider>
       </PrivacyProvider>
     </ThemeProvider>
