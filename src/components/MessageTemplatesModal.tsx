@@ -8,6 +8,8 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MessageTemplate, MessageTemplateKey } from '../types';
@@ -48,6 +50,7 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
   const keyboardHeight = useKeyboardBottomInset();
   const inputRef = useRef<TextInput>(null);
   const tabsScrollRef = useRef<ScrollView>(null);
+  const tagsScrollRef = useRef<ScrollView>(null);
 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [selectedKey, setSelectedKey] = useState<MessageTemplateKey>('friendly_reminder');
@@ -55,6 +58,33 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
   const [editingBody, setEditingBody] = useState<string>('');
   const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [saving, setSaving] = useState<boolean>(false);
+  const [activeTagIndex, setActiveTagIndex] = useState<number>(0);
+
+  const handleTagsScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const layoutWidth = event.nativeEvent.layoutMeasurement.width;
+    const contentWidth = event.nativeEvent.contentSize.width;
+    const maxScroll = contentWidth - layoutWidth;
+
+    if (maxScroll <= 0) {
+      setActiveTagIndex(0);
+      return;
+    }
+
+    const progress = Math.max(0, Math.min(1, contentOffsetX / maxScroll));
+    const calculatedIndex = Math.round(progress * (PLACEHOLDERS.length - 1));
+    setActiveTagIndex(calculatedIndex);
+  };
+
+  const handleSelectTagDot = (index: number) => {
+    setActiveTagIndex(index);
+    if (tagsScrollRef.current) {
+      tagsScrollRef.current.scrollTo({
+        x: index * 135,
+        animated: true,
+      });
+    }
+  };
 
   useEffect(() => {
     if (visible) {
@@ -362,28 +392,47 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
               </View>
             </View>
 
-            {/* Barra de Variáveis com Touch Target Amplo (>= 44px) */}
+            {/* Barra de Variáveis com Touch Target Amplo (>= 44px) e Indicador de Bolinhas */}
             <View style={styles.fieldGroup}>
               <View style={styles.tagsHeaderRow}>
-                <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
-                  Variáveis Disponíveis
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
+                    Variáveis Disponíveis
+                  </Text>
+                  <View style={[styles.miniCountBadge, { backgroundColor: theme.primaryBg }]}>
+                    <Text style={[styles.miniCountText, { color: theme.primary }]}>
+                      {activeTagIndex + 1}/{PLACEHOLDERS.length}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={[styles.tagsHelp, { color: theme.textMuted }]}>
-                  Toque para inserir no cursor
+                  Toque p/ inserir • Deslize 👉
                 </Text>
               </View>
 
               <ScrollView
+                ref={tagsScrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.tagsScroll}
                 keyboardShouldPersistTaps="always"
+                onScroll={handleTagsScroll}
+                scrollEventThrottle={16}
               >
-                {PLACEHOLDERS.map((p) => (
+                {PLACEHOLDERS.map((p, idx) => (
                   <TouchableOpacity
                     key={p.tag}
-                    style={[styles.tagChip, { backgroundColor: theme.primaryBg, borderColor: theme.primary }]}
-                    onPress={() => handleInsertTag(p.tag)}
+                    style={[
+                      styles.tagChip,
+                      {
+                        backgroundColor: activeTagIndex === idx ? theme.primaryBg : theme.cardSecondary,
+                        borderColor: activeTagIndex === idx ? theme.primary : theme.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      setActiveTagIndex(idx);
+                      handleInsertTag(p.tag);
+                    }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name={p.icon} size={15} color={theme.primary} />
@@ -394,6 +443,28 @@ export const MessageTemplatesModal: React.FC<MessageTemplatesModalProps> = ({
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              {/* Indicador de Bolinhas do Carrossel de Variáveis */}
+              <View style={styles.tagsDotsIndicatorRow}>
+                {PLACEHOLDERS.map((p, idx) => {
+                  const isSelected = activeTagIndex === idx;
+                  return (
+                    <TouchableOpacity
+                      key={`tag-dot-${p.tag}`}
+                      onPress={() => handleSelectTagDot(idx)}
+                      activeOpacity={0.7}
+                      accessibilityLabel={`Variável ${p.label}`}
+                      style={[
+                        styles.indicatorDot,
+                        {
+                          backgroundColor: isSelected ? theme.primary : theme.border,
+                          width: isSelected ? 18 : 6,
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
             </View>
 
             {/* Editor de Texto da Mensagem */}
@@ -627,12 +698,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  miniCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  miniCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
   tagsHelp: {
     fontSize: 11,
   },
   tagsScroll: {
     gap: 8,
     paddingVertical: 4,
+  },
+  tagsDotsIndicatorRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
   },
   tagChip: {
     flexDirection: 'row',
