@@ -30,7 +30,11 @@ This is an Expo/React Native mobile application for controlling credit sales ("v
 > Documento canônico e passo a passo: [`docs/doctrine/DESENVOLVIMENTO_HOTRELOAD.md`](docs/doctrine/DESENVOLVIMENTO_HOTRELOAD.md).
 
 - **O Usuário é Apenas Testador:** O usuário NUNCA deve ser instruído a rodar comandos de terminal, ligar emulador na mão ou gerenciar processos. A única preocupação dele é testar o aplicativo e validar UX/UI.
-- **Controle de Ligar/Desligar pelo Agente:** O usuário apenas diz quando ligar ("roda o projeto", "liga o app") e quando desligar ("para", "desliga"). O próprio agente executa todo o ecossistema (emulador com flags ideais de tela, ADB, Metro bundler em background e abertura do app).
+- **Controle de Ligar/Desligar pelo Agente:** O usuário apenas diz quando ligar ("roda o projeto", "liga o app") e quando desligar ("para", "desliga"). O próprio agente executa todo o ecossistema e entrega o app pronto para uso.
+- **Preferência de Ambiente:**
+  - **Primário (Padrão): Celular Físico via Expo Go** (`exp://<IP-Local>:8081`). O agente sobe o Metro e informa a URL/QR para o usuário abrir no próprio smartphone.
+  - **Secundário: Navegador Web** (`npx expo start --web`). Usado quando o usuário pedir para testar no PC / navegador. O agente inicia o web e abre `http://localhost:8081`.
+  - **Emulador Android Local (Desencorajado):** Não subir automaticamente. O emulador no Windows é instável/pesado ("bugado") e só deve ser acionado sob pedido explícito do usuário.
 - **Hot Reload / Fast Refresh Obrigatório:** Qualquer alteração em componentes, cores, textos ou estilos DEVE ser testada ao vivo via Metro Bundler (Fast Refresh instantâneo). **NUNCA** faça o usuário esperar a compilação de um APK de Release (`gradlew assembleRelease`) para validar alterações visuais.
 - **Compilação de APK é Apenas para Publicação:** O workflow de release (Seção 4) só deve ser executado quando o usuário pedir expressamente para publicar ou gerar uma nova versão oficial.
 

@@ -31,11 +31,12 @@ vi.mock('../src/database/notificationRepository', () => ({
 }));
 
 import { evaluateNotificationRuleContent } from '../src/services/notificationService';
+import { getTodayISO } from '../src/utils/date';
 import { NotificationRule } from '../src/types';
 
 describe('Avaliação de Regras de Notificação do Irineu', () => {
   it('deve disparar no dia recomendado de cobrança (on_due_date)', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getTodayISO();
     const rule: NotificationRule = {
       id: 'rule-today',
       type: 'on_due_date',
