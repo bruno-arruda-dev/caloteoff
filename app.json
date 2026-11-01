@@ -2,7 +2,7 @@
   "expo": {
     "name": "Irineu",
     "slug": "irineu",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.particular.caloteoff",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#EEF2FF",
         "foregroundImage": "./assets/android-icon-foreground.png",

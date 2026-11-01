@@ -9,6 +9,7 @@ import {
   ScrollView,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -53,6 +54,15 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   const [clientSearch, setClientSearch] = useState<string>('');
   const [isSelectingClient, setIsSelectingClient] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [attachMenuVisible, setAttachMenuVisible] = useState<boolean>(false);
+  const [limitWarningData, setLimitWarningData] = useState<{
+    isBlocked: boolean;
+    amount: number;
+    limit: number;
+    projectedBalance: number;
+    exceededAmount: number;
+    clientName: string;
+  } | null>(null);
 
   const resetForm = useCallback(() => {
     setSelectedClient(initialClient || null);
@@ -65,6 +75,8 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
     setIsSelectingClient(false);
     setLoading(false);
     setClientSearch('');
+    setAttachMenuVisible(false);
+    setLimitWarningData(null);
   }, [initialClient]);
 
   useEffect(() => {
@@ -79,6 +91,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   };
 
   const handlePickFromCamera = async () => {
+    setAttachMenuVisible(false);
     try {
       const res = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
@@ -96,6 +109,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   };
 
   const handlePickFromGallery = async () => {
+    setAttachMenuVisible(false);
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -113,6 +127,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   };
 
   const handlePickFromStorage = async () => {
+    setAttachMenuVisible(false);
     try {
       const res = await DocumentPicker.getDocumentAsync({
         type: ['*/*'],
@@ -130,25 +145,7 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
   };
 
   const handleOpenAttachOptions = () => {
-    Alert.alert(
-      'Anexar Comprovante / Arquivo',
-      'De onde você deseja selecionar o arquivo?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: '📷 Tirar Foto (Câmera)',
-          onPress: handlePickFromCamera,
-        },
-        {
-          text: '🖼️ Escolher da Galeria',
-          onPress: handlePickFromGallery,
-        },
-        {
-          text: '📁 Memória do Aparelho (PDF/Arquivo)',
-          onPress: handlePickFromStorage,
-        },
-      ]
-    );
+    setAttachMenuVisible(true);
   };
 
   const handleSave = async () => {
@@ -186,28 +183,15 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
     );
 
     if (limitCheck.isExceeded) {
-      if (!limitCheck.allowed) {
-        Alert.alert(
-          '⛔ Limite Bloqueado',
-          `Este cliente tem limite de ${formatCurrency(selectedClient.credit_limit || 0)}. Com esta compra de ${formatCurrency(amount)}, a conta atingiria ${formatCurrency(limitCheck.projectedBalance)}, estourando o limite em ${formatCurrency(limitCheck.exceededAmount)}. A política configurada bloqueia novas compras fiadas.`
-        );
-        return;
-      } else {
-        // AVISAR_E_PERMITIR
-        Alert.alert(
-          '⚠️ Alerta de Limite Excedido',
-          `Esta compra de ${formatCurrency(amount)} vai estourar o limite de fiado em ${formatCurrency(limitCheck.exceededAmount)} (Total: ${formatCurrency(limitCheck.projectedBalance)}). Deseja pendurar mesmo assim?`,
-          [
-            { text: 'Cancelar', style: 'cancel' },
-            {
-              text: 'Pendurar Mesmo Assim',
-              style: 'destructive',
-              onPress: () => executeSave(amount),
-            },
-          ]
-        );
-        return;
-      }
+      setLimitWarningData({
+        isBlocked: !limitCheck.allowed,
+        amount,
+        limit: selectedClient.credit_limit || 0,
+        projectedBalance: limitCheck.projectedBalance,
+        exceededAmount: limitCheck.exceededAmount,
+        clientName: selectedClient.nickname || selectedClient.name,
+      });
+      return;
     }
 
     await executeSave(amount);
@@ -511,6 +495,179 @@ export const NewDebitModal: React.FC<NewDebitModalProps> = ({
           </View>
         </View>
       </View>
+
+      {/* MODAL IN-APP DE AVISO / BLOQUEIO DE LIMITE DE FIADO (100% CROSS-PLATFORM) */}
+      <Modal
+        visible={!!limitWarningData}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!loading) setLimitWarningData(null);
+        }}
+      >
+        <View style={styles.limitBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              if (!loading) setLimitWarningData(null);
+            }}
+          />
+          <View style={[styles.limitCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.limitIconCircle,
+                { backgroundColor: limitWarningData?.isBlocked ? '#FEE2E2' : '#FEF3C7' },
+              ]}
+            >
+              <Ionicons
+                name={limitWarningData?.isBlocked ? 'ban' : 'warning-outline'}
+                size={28}
+                color={limitWarningData?.isBlocked ? '#DC2626' : '#D97706'}
+              />
+            </View>
+
+            <Text style={[styles.limitTitle, { color: theme.textPrimary }]}>
+              {limitWarningData?.isBlocked ? 'Limite de Fiado Bloqueado' : 'Alerta de Limite Excedido'}
+            </Text>
+
+            <Text style={[styles.limitClientName, { color: theme.primary }]}>
+              {limitWarningData?.clientName}
+            </Text>
+
+            <View style={[styles.limitBreakdownBox, { backgroundColor: theme.cardSecondary, borderColor: theme.borderLight }]}>
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitRowLabel, { color: theme.textSecondary }]}>Limite do Cliente:</Text>
+                <Text style={[styles.limitRowVal, { color: theme.textPrimary }]}>
+                  {formatCurrency(limitWarningData?.limit || 0)}
+                </Text>
+              </View>
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitRowLabel, { color: theme.textSecondary }]}>Novo Fiado Solicitado:</Text>
+                <Text style={[styles.limitRowVal, { color: theme.expense, fontWeight: '800' }]}>
+                  +{formatCurrency(limitWarningData?.amount || 0)}
+                </Text>
+              </View>
+              <View style={[styles.limitDivider, { backgroundColor: theme.border }]} />
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitRowLabel, { color: theme.textSecondary }]}>Saldo Total Ficará:</Text>
+                <Text style={[styles.limitRowVal, { color: theme.expense, fontWeight: '800' }]}>
+                  {formatCurrency(limitWarningData?.projectedBalance || 0)}
+                </Text>
+              </View>
+              <View style={styles.limitRow}>
+                <Text style={[styles.limitRowLabel, { color: '#DC2626', fontWeight: '700' }]}>Estouro do Limite:</Text>
+                <Text style={[styles.limitRowVal, { color: '#DC2626', fontWeight: '900' }]}>
+                  +{formatCurrency(limitWarningData?.exceededAmount || 0)}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.limitNotice, { color: theme.textSecondary }]}>
+              {limitWarningData?.isBlocked
+                ? 'A política configurada bloqueia novas compras fiadas quando o limite é atingido.'
+                : 'Esta compra vai ultrapassar o limite estipulado. Deseja autorizar e pendurar mesmo assim?'}
+            </Text>
+
+            <View style={styles.limitActionsRow}>
+              <TouchableOpacity
+                style={[styles.limitBtn, styles.limitCancelBtn, { borderColor: theme.border }]}
+                onPress={() => setLimitWarningData(null)}
+                disabled={loading}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.limitCancelText, { color: theme.textSecondary }]}>
+                  {limitWarningData?.isBlocked ? 'Fechar' : 'Cancelar'}
+                </Text>
+              </TouchableOpacity>
+
+              {!limitWarningData?.isBlocked && (
+                <TouchableOpacity
+                  style={[styles.limitBtn, styles.limitConfirmBtn, { backgroundColor: '#D97706' }]}
+                  onPress={async () => {
+                    if (!limitWarningData) return;
+                    const amt = limitWarningData.amount;
+                    setLimitWarningData(null);
+                    await executeSave(amt);
+                  }}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-sharp" size={16} color="#FFFFFF" />
+                      <Text style={styles.limitConfirmText}>Pendurar Mesmo Assim</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL IN-APP DE OPÇÕES DE ANEXO (CÂMERA / GALERIA / ARQUIVOS) */}
+      <Modal
+        visible={attachMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAttachMenuVisible(false)}
+      >
+        <View style={styles.limitBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setAttachMenuVisible(false)}
+          />
+          <View style={[styles.attachCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.attachTitle, { color: theme.textPrimary }]}>
+              Anexar Comprovante / Canhoto
+            </Text>
+            <Text style={[styles.attachSubtitle, { color: theme.textSecondary }]}>
+              Selecione o arquivo de comprovante:
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.attachOptionRow, { backgroundColor: theme.cardSecondary }]}
+              onPress={handlePickFromCamera}
+            >
+              <Ionicons name="camera-outline" size={20} color={theme.primary} />
+              <Text style={[styles.attachOptionText, { color: theme.textPrimary }]}>
+                Tirar Foto com a Câmera
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.attachOptionRow, { backgroundColor: theme.cardSecondary }]}
+              onPress={handlePickFromGallery}
+            >
+              <Ionicons name="images-outline" size={20} color={theme.primary} />
+              <Text style={[styles.attachOptionText, { color: theme.textPrimary }]}>
+                Escolher da Galeria de Fotos
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.attachOptionRow, { backgroundColor: theme.cardSecondary }]}
+              onPress={handlePickFromStorage}
+            >
+              <Ionicons name="folder-open-outline" size={20} color={theme.primary} />
+              <Text style={[styles.attachOptionText, { color: theme.textPrimary }]}>
+                Memória do Aparelho (PDF / Imagem)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.attachCancelBtn, { borderColor: theme.border }]}
+              onPress={() => setAttachMenuVisible(false)}
+            >
+              <Text style={[styles.attachCancelText, { color: theme.textSecondary }]}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -722,5 +879,139 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '800',
+  },
+  limitBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  limitCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 22,
+    padding: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  limitIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  limitTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  limitClientName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  limitBreakdownBox: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 14,
+  },
+  limitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  limitRowLabel: {
+    fontSize: 13,
+  },
+  limitRowVal: {
+    fontSize: 13,
+  },
+  limitDivider: {
+    height: 1,
+    marginVertical: 6,
+  },
+  limitNotice: {
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  limitActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  limitBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  limitCancelBtn: {
+    borderWidth: 1,
+  },
+  limitCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  limitConfirmBtn: {},
+  limitConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  attachCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+  },
+  attachTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  attachSubtitle: {
+    fontSize: 12,
+    marginBottom: 16,
+  },
+  attachOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  attachOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attachCancelBtn: {
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  attachCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

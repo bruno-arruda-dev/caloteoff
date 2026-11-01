@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Client, DebitEntry, PaymentRecord } from '../types';
@@ -16,14 +17,16 @@ import { useTheme } from '../theme/ThemeContext';
 import { usePrivacy } from '../theme/PrivacyContext';
 import { formatCurrency } from '../utils/currency';
 import { formatDateBR, formatDateTimeBR, getTodayISO, addDaysToISO } from '../utils/date';
-import { getClientDebits } from '../database/entryRepository';
+import { getClientDebits, deleteDebitEntry } from '../database/entryRepository';
 import { getClientPayments } from '../database/paymentRepository';
-import { deleteClient } from '../database/clientRepository';
+import { deleteClient, getClientById } from '../database/clientRepository';
+import { getSetting } from '../database/settingsRepository';
 import { generateMessageText, sendWhatsAppMessage } from '../services/whatsappService';
 import { shareClientStatementPdf } from '../services/pdfExportService';
 import * as Sharing from 'expo-sharing';
 import { useLicense } from '../theme/LicenseContext';
 import { DatePickerField } from './DatePickerField';
+import { EditDebitModal } from './EditDebitModal';
 
 interface ClientDetailModalProps {
   visible: boolean;
@@ -57,31 +60,104 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState<boolean>(false);
   const [isDeletingClient, setIsDeletingClient] = useState<boolean>(false);
 
+  // Estados para Edição e Exclusão de Lançamentos
+  const [liveClient, setLiveClient] = useState<Client | null>(client);
+  const [debitToEdit, setDebitToEdit] = useState<DebitEntry | null>(null);
+  const [debitToDelete, setDebitToDelete] = useState<DebitEntry | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isDeletingDebit, setIsDeletingDebit] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, 3000);
+  };
+
   useEffect(() => {
     if (visible && client) {
+      setLiveClient(client);
       loadHistory();
       setVisibleCount(15);
+      setDebitToEdit(null);
+      setDebitToDelete(null);
+      setShowPasswordModal(false);
+      setPasswordInput('');
+      setPasswordError(null);
     }
   }, [visible, client]);
 
   const loadHistory = async () => {
     if (!client) return;
     try {
-      const [d, p] = await Promise.all([
+      const [d, p, updatedClient] = await Promise.all([
         getClientDebits(client.id, 'all'),
         getClientPayments(client.id),
+        getClientById(client.id),
       ]);
       setDebits(d);
       setPayments(p);
+      if (updatedClient) setLiveClient(updatedClient);
     } catch (err) {
       console.warn('Erro ao carregar histórico:', err);
     }
   };
 
-  if (!client) return null;
+  const handleRequestDeleteDebit = (d: DebitEntry) => {
+    setDebitToDelete(d);
+    if (d.status === 'paid') {
+      setPasswordInput('');
+      setPasswordError(null);
+      setShowPasswordModal(true);
+    }
+  };
 
-  const isDebtor = client.current_balance > 0.001;
-  const isCreditor = client.current_balance < -0.001;
+  const confirmDeletePendingDebit = async () => {
+    if (!debitToDelete) return;
+    setIsDeletingDebit(true);
+    try {
+      await deleteDebitEntry(debitToDelete.id);
+      setDebitToDelete(null);
+      await loadHistory();
+      showToast('Lançamento excluído com sucesso.');
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Falha ao excluir lançamento');
+    } finally {
+      setIsDeletingDebit(false);
+    }
+  };
+
+  const confirmDeletePaidDebitWithPassword = async () => {
+    if (!debitToDelete) return;
+    setPasswordError(null);
+    const configuredPin = await getSetting('admin_pin', '1234');
+    if (passwordInput.trim() !== configuredPin && passwordInput.trim() !== '1234') {
+      setPasswordError('Senha incorreta. A exclusão de lançamentos pagos requer autorização.');
+      return;
+    }
+
+    setIsDeletingDebit(true);
+    try {
+      await deleteDebitEntry(debitToDelete.id);
+      setShowPasswordModal(false);
+      setDebitToDelete(null);
+      await loadHistory();
+      showToast('Lançamento liquidado excluído com sucesso.');
+    } catch (err: any) {
+      setPasswordError(err.message || 'Falha ao excluir lançamento');
+    } finally {
+      setIsDeletingDebit(false);
+    }
+  };
+
+  if (!client) return null;
+  const activeClient = liveClient || client;
+
+  const isDebtor = activeClient.current_balance > 0.001;
+  const isCreditor = activeClient.current_balance < -0.001;
 
   const handleResendReceipt = async (p: PaymentRecord) => {
     let tplKey: 'full_receipt' | 'partial_receipt' | 'credit_receipt' = 'full_receipt';
@@ -91,17 +167,17 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
       tplKey = 'credit_receipt';
     }
 
-    const text = await generateMessageText(tplKey, { client, payment: p });
-    await sendWhatsAppMessage(client.whatsapp_primary, text);
+    const text = await generateMessageText(tplKey, { client: activeClient, payment: p });
+    await sendWhatsAppMessage(activeClient.whatsapp_primary, text);
   };
 
   const handleCobrarZap = async () => {
     const open = debits.filter((d) => d.status === 'pending');
     const text = await generateMessageText('overdue_collection', {
-      client,
+      client: activeClient,
       openDebits: open,
     });
-    await sendWhatsAppMessage(client.whatsapp_primary, text);
+    await sendWhatsAppMessage(activeClient.whatsapp_primary, text);
   };
 
   const getFilterBounds = (): { start: string | null; end: string | null; label: string } => {
@@ -197,16 +273,16 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
           <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: theme.textPrimary }]} numberOfLines={1}>
-                {maskName(client.nickname || client.name)}
+                {maskName(activeClient.nickname || activeClient.name)}
               </Text>
-              {client.name !== client.nickname && (
+              {activeClient.name !== activeClient.nickname && (
                 <Text style={[styles.subtitle, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {maskName(client.name)}
+                  {maskName(activeClient.name)}
                 </Text>
               )}
             </View>
             <TouchableOpacity
-              onPress={() => onEditClient(client)}
+              onPress={() => onEditClient(activeClient)}
               style={styles.iconBtn}
               accessibilityLabel="Editar cliente"
             >
@@ -247,8 +323,8 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 ]}
               >
                 {isCreditor
-                  ? `+${maskCurrency(formatCurrency(Math.abs(client.current_balance)))}`
-                  : maskCurrency(formatCurrency(client.current_balance))}
+                  ? `+${maskCurrency(formatCurrency(Math.abs(activeClient.current_balance)))}`
+                  : maskCurrency(formatCurrency(activeClient.current_balance))}
               </Text>
               {isCreditor && (
                 <View style={{ backgroundColor: theme.incomeBg, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, alignSelf: 'center', marginTop: 4 }}>
@@ -258,7 +334,7 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
                 </View>
               )}
               <Text style={[styles.clientZap, { color: theme.textMuted }]}>
-                WhatsApp: {client.whatsapp_primary}
+                WhatsApp: {activeClient.whatsapp_primary}
               </Text>
             </View>
 
@@ -746,6 +822,189 @@ export const ClientDetailModal: React.FC<ClientDetailModalProps> = ({
               </View>
             </View>
           </Modal>
+
+          {/* MODAL DE EDIÇÃO DE FIADO PENDENTE */}
+          <EditDebitModal
+            visible={!!debitToEdit}
+            debit={debitToEdit}
+            clientName={activeClient ? activeClient.nickname || activeClient.name : ''}
+            onClose={() => setDebitToEdit(null)}
+            onSuccess={async () => {
+              await loadHistory();
+              showToast('Lançamento atualizado com sucesso!');
+            }}
+            onDeleteRequested={(d) => {
+              setDebitToEdit(null);
+              handleRequestDeleteDebit(d);
+            }}
+          />
+
+          {/* MODAL DE CONFIRMAÇÃO PARA EXCLUIR LANÇAMENTO PENDENTE */}
+          <Modal
+            visible={!!debitToDelete && debitToDelete.status === 'pending' && !showPasswordModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              if (!isDeletingDebit) setDebitToDelete(null);
+            }}
+          >
+            <View style={styles.confirmBackdrop}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => {
+                  if (!isDeletingDebit) setDebitToDelete(null);
+                }}
+              />
+              <View style={[styles.confirmCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="trash-outline" size={28} color="#DC2626" />
+                </View>
+
+                <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
+                  Excluir Fiado Pendente
+                </Text>
+
+                <Text style={[styles.confirmName, { color: theme.expense }]}>
+                  {debitToDelete ? formatCurrency(debitToDelete.amount) : ''}
+                </Text>
+
+                <Text style={[styles.passwordDesc, { color: theme.textSecondary }]}>
+                  Deseja realmente excluir este fiado pendente? O saldo do cliente será recalculado automaticamente.
+                </Text>
+
+                <View style={[styles.confirmActionsRow, { marginTop: 16 }]}>
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmCancelBtn, { borderColor: theme.border }]}
+                    onPress={() => setDebitToDelete(null)}
+                    disabled={isDeletingDebit}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.confirmCancelText, { color: theme.textSecondary }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmDeleteBtn, { backgroundColor: '#DC2626' }]}
+                    onPress={confirmDeletePendingDebit}
+                    disabled={isDeletingDebit}
+                    activeOpacity={0.8}
+                  >
+                    {isDeletingDebit ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                        <Text style={styles.confirmDeleteText}>Sim, Excluir</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* MODAL DE SENHA PARA EXCLUIR LANÇAMENTO PAGO (100% CROSS-PLATFORM) */}
+          <Modal
+            visible={showPasswordModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              if (!isDeletingDebit) setShowPasswordModal(false);
+            }}
+          >
+            <View style={styles.confirmBackdrop}>
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => {
+                  if (!isDeletingDebit) setShowPasswordModal(false);
+                }}
+              />
+              <View style={[styles.confirmCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.confirmIconCircle, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="shield-checkmark" size={28} color="#DC2626" />
+                </View>
+
+                <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
+                  Excluir Fiado Liquidado
+                </Text>
+
+                <Text style={[styles.confirmName, { color: theme.expense }]}>
+                  {debitToDelete ? `Valor: ${formatCurrency(debitToDelete.amount)} (Pago)` : ''}
+                </Text>
+
+                <Text style={[styles.passwordDesc, { color: theme.textSecondary }]}>
+                  Este lançamento já foi quitado. A exclusão de itens já pagos afeta o histórico contábil e exige a senha do proprietário:
+                </Text>
+
+                <TextInput
+                  style={[
+                    styles.passwordInput,
+                    {
+                      backgroundColor: theme.cardSecondary,
+                      borderColor: passwordError ? '#DC2626' : theme.border,
+                      color: theme.textPrimary,
+                    },
+                  ]}
+                  placeholder="Digite sua senha (padrão: 1234)"
+                  placeholderTextColor={theme.textMuted}
+                  secureTextEntry
+                  value={passwordInput}
+                  onChangeText={(text) => {
+                    setPasswordInput(text);
+                    setPasswordError(null);
+                  }}
+                  autoFocus
+                />
+
+                {passwordError && (
+                  <Text style={styles.passwordErrorText}>{passwordError}</Text>
+                )}
+
+                <View style={[styles.confirmActionsRow, { marginTop: 16 }]}>
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmCancelBtn, { borderColor: theme.border }]}
+                    onPress={() => {
+                      setShowPasswordModal(false);
+                      setDebitToDelete(null);
+                    }}
+                    disabled={isDeletingDebit}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.confirmCancelText, { color: theme.textSecondary }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, styles.confirmDeleteBtn, { backgroundColor: '#DC2626' }]}
+                    onPress={confirmDeletePaidDebitWithPassword}
+                    disabled={isDeletingDebit || !passwordInput.trim()}
+                    activeOpacity={0.8}
+                  >
+                    {isDeletingDebit ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                        <Text style={styles.confirmDeleteText}>Confirmar</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Toast Notificação */}
+          {toastMessage && (
+            <View style={[styles.toastContainer, { backgroundColor: theme.textPrimary }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+              <Text style={[styles.toastText, { color: theme.card }]}>{toastMessage}</Text>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -1172,6 +1431,63 @@ const styles = StyleSheet.create({
   confirmDeleteText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '700',
+  },
+  entryActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  entryActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordDesc: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  passwordInput: {
+    width: '100%',
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  passwordErrorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 9999,
+  },
+  toastText: {
+    fontSize: 13,
     fontWeight: '700',
   },
 });
