@@ -13,8 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { AddressContact, BillingCycle, Client, LimitPolicy, PhoneContact } from '../types';
 import { useTheme } from '../theme/ThemeContext';
 import { useKeyboardBottomInset } from '../hooks/useKeyboardBottomInset';
-import { parseCurrencyInput, formatCurrencyInput } from '../utils/currency';
+import { parseCurrencyInput, formatCurrencyInput, formatCurrency } from '../utils/currency';
 import { createClient, updateClient, countActiveDebtorClients } from '../database/clientRepository';
+import { getClientDebits } from '../database/entryRepository';
+import { getClientPayments } from '../database/paymentRepository';
 import { useLicense } from '../theme/LicenseContext';
 
 interface ClientFormModalProps {
@@ -22,6 +24,7 @@ interface ClientFormModalProps {
   client?: Client | null;
   onClose: () => void;
   onSuccess: (client: Client) => void;
+  onViewHistory?: (client: Client) => void;
 }
 
 export const ClientFormModal: React.FC<ClientFormModalProps> = ({
@@ -29,6 +32,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   client,
   onClose,
   onSuccess,
+  onViewHistory,
 }) => {
   const { theme } = useTheme();
   const keyboardHeight = useKeyboardBottomInset();
@@ -46,6 +50,10 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [addresses, setAddresses] = useState<AddressContact[]>([]);
   const [showMore, setShowMore] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  const [historySummary, setHistorySummary] = useState<{
+    debitsCount: number;
+    paymentsCount: number;
+  } | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -61,6 +69,14 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         setPhones(client.phones ? JSON.parse(JSON.stringify(client.phones)) : []);
         setAddresses(client.addresses ? JSON.parse(JSON.stringify(client.addresses)) : []);
         setShowMore(true);
+
+        getClientDebits(client.id, 'all')
+          .then((debits) => {
+            return getClientPayments(client.id).then((payments) => {
+              setHistorySummary({ debitsCount: debits.length, paymentsCount: payments.length });
+            });
+          })
+          .catch(() => setHistorySummary(null));
       } else {
         setName('');
         setNickname('');
@@ -73,6 +89,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         setPhones([]);
         setAddresses([]);
         setShowMore(false);
+        setHistorySummary(null);
       }
     }
   }, [visible, client]);
@@ -176,20 +193,119 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.borderLight }]}>
-            <View>
+            <View style={{ flex: 1, marginRight: 8 }}>
               <Text style={[styles.title, { color: theme.textPrimary }]}>
                 {client ? 'Editar Cliente' : 'Novo Cliente'}
               </Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-                Cadastre quem compra fiado no seu negócio
+                {client ? 'Dados cadastrais e histórico de compras' : 'Cadastre quem compra fiado no seu negócio'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={theme.textSecondary} />
-            </TouchableOpacity>
+            <View style={styles.headerRightRow}>
+              {client && onViewHistory && (
+                <TouchableOpacity
+                  onPress={() => {
+                    onClose();
+                    onViewHistory(client);
+                  }}
+                  style={[styles.headerHistoryBtn, { backgroundColor: theme.primaryBg }]}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Ver histórico do cliente"
+                >
+                  <Ionicons name="time-outline" size={16} color={theme.primary} />
+                  <Text style={[styles.headerHistoryBtnText, { color: theme.primary }]}>
+                    Histórico
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+            {/* Banner/Card de Histórico (Disponível quando cliente já existe) */}
+            {client && onViewHistory && (
+              <TouchableOpacity
+                style={[
+                  styles.historyCard,
+                  {
+                    backgroundColor: theme.cardSecondary,
+                    borderColor: theme.border,
+                  },
+                ]}
+                onPress={() => {
+                  onClose();
+                  onViewHistory(client);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.historyCardLeft}>
+                  <View
+                    style={[
+                      styles.historyIconBox,
+                      {
+                        backgroundColor:
+                          client.current_balance > 0.001
+                            ? theme.expenseBg
+                            : client.current_balance < -0.001
+                            ? '#EDE9FE'
+                            : theme.incomeBg,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name="time"
+                      size={20}
+                      color={
+                        client.current_balance > 0.001
+                          ? theme.expense
+                          : client.current_balance < -0.001
+                          ? '#7C3AED'
+                          : theme.income
+                      }
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.historyCardTitle, { color: theme.textPrimary }]}>
+                      Histórico e Lançamentos
+                    </Text>
+                    <Text
+                      style={[
+                        styles.historyCardBalance,
+                        {
+                          color:
+                            client.current_balance > 0.001
+                              ? theme.expense
+                              : client.current_balance < -0.001
+                              ? '#7C3AED'
+                              : theme.income,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {client.current_balance > 0.001
+                        ? `Deve: ${formatCurrency(client.current_balance)}`
+                        : client.current_balance < -0.001
+                        ? `Crédito: ${formatCurrency(Math.abs(client.current_balance))}`
+                        : 'Conta em dia (R$ 0,00)'}
+                      {historySummary
+                        ? ` • ${historySummary.debitsCount} ${
+                            historySummary.debitsCount === 1 ? 'lançamento' : 'lançamentos'
+                          } • ${historySummary.paymentsCount} ${
+                            historySummary.paymentsCount === 1 ? 'pagamento' : 'pagamentos'
+                          }`
+                        : ''}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.historyCardRight}>
+                  <Text style={[styles.historyCardActionText, { color: theme.primary }]}>Ver</Text>
+                  <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+                </View>
+              </TouchableOpacity>
+            )}
             {/* Nome */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: theme.textSecondary }]}>Nome *</Text>
@@ -745,17 +861,47 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
           {/* Footer */}
           <View style={[styles.footer, { borderTopColor: theme.borderLight }]}>
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: theme.primary }]}
-              onPress={handleSave}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark-sharp" size={20} color={theme.primaryText} />
-              <Text style={[styles.saveBtnText, { color: theme.primaryText }]}>
-                {loading ? 'Salvando...' : 'Salvar Cliente'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.footerRow}>
+              {client && onViewHistory && (
+                <TouchableOpacity
+                  style={[
+                    styles.historyFooterBtn,
+                    {
+                      borderColor: theme.border,
+                      backgroundColor: theme.cardSecondary,
+                    },
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    onViewHistory(client);
+                  }}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Ver histórico do cliente"
+                >
+                  <Ionicons name="time-outline" size={18} color={theme.textPrimary} />
+                  <Text style={[styles.historyFooterBtnText, { color: theme.textPrimary }]}>
+                    Ver Histórico
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.saveBtn,
+                  {
+                    backgroundColor: theme.primary,
+                    flex: client && onViewHistory ? 1 : undefined,
+                  },
+                ]}
+                onPress={handleSave}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark-sharp" size={20} color={theme.primaryText} />
+                <Text style={[styles.saveBtnText, { color: theme.primaryText }]}>
+                  {loading ? 'Salvando...' : client ? 'Salvar Alterações' : 'Salvar Cliente'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -792,8 +938,66 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 4,
   },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerHistoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  headerHistoryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   body: {
     padding: 20,
+  },
+  historyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  historyCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  historyIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  historyCardBalance: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  historyCardRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  historyCardActionText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   fieldGroup: {
     marginBottom: 16,
@@ -913,6 +1117,25 @@ const styles = StyleSheet.create({
   footer: {
     padding: 20,
     borderTopWidth: 1,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  historyFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 6,
+  },
+  historyFooterBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   saveBtn: {
     flexDirection: 'row',

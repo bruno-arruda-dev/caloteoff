@@ -100,7 +100,7 @@ function MainScreen() {
   const loadData = useCallback(async () => {
     try {
       const [debtorList, fullList, profile] = await Promise.all([
-        getClients(sortOption, searchQuery, { onlyDebtors: true }),
+        getClients(sortOption, searchQuery, { onlyDebtors: searchQuery.trim().length === 0 }),
         getClients('alphabetical'),
         getBusinessProfile(),
       ]);
@@ -433,6 +433,7 @@ function MainScreen() {
           loadData();
         }}
         onEditClient={(client) => {
+          setDetailModalVisible(false);
           setClientToEdit(client);
           setClientFormVisible(true);
         }}
@@ -446,6 +447,11 @@ function MainScreen() {
         visible={clientFormVisible}
         client={clientToEdit}
         onClose={() => setClientFormVisible(false)}
+        onViewHistory={(client) => {
+          setClientFormVisible(false);
+          setSelectedClientDetail(client);
+          setDetailModalVisible(true);
+        }}
         onSuccess={(saved) => {
           loadData();
           if (selectedClientDetail && selectedClientDetail.id === saved.id) {
